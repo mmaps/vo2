@@ -3,6 +3,7 @@
 ## Dependencies
 - Python 2.7
 - VirtualBox
+- Intel's PIN
 
 ## Installation
 
@@ -26,6 +27,10 @@
   - Add the public key to your `authorized_keys` file in order for the agents to be able to log things to the host over the network.
 
 ### Guest Installation
+- Install PIN, the default `pin.cfg` will expect the following:
+  - Version: 2.11-49306
+  - Path: `c:\pin-2.11-49306-msvc10-ia32_intel65-windows\`
+    - Where the pin dll tool is in `source\tools\SimpleExamples\obj-ia32\v5.dll`
 - Copy the folder `remote/` and its contents to the guest root folder `c:\`
   - If `c:\` is not the root you should update the variables at the top of `vo2\guests\vbox.py`
 
