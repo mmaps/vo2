@@ -20,14 +20,13 @@ class Task(object):
         self.logfile = None
         self.retval = False
         self.sample = Sample(name, path)
-        self.rootlogdir = os.path.join(cfg.log, cfg.name)
-        self.logdir = os.path.join(self.rootlogdir, self.sample.name)
+        self.logdir = os.path.join(cfg.log, self.sample.logdir)
         self.errors = []
 
     def init(self):
         mask = os.umask(0007)
         try:
-            os.mkdir(self.logdir, 0770)
+            os.makedirs(self.logdir, 0770)
         except OSError:
             logging.error("TASK unable to create log directory: %s" % self.logdir)
             return False

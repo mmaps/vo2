@@ -1,5 +1,6 @@
 import os
 import sys
+import logging as log
 from importlib import import_module
 
 
@@ -16,10 +17,12 @@ class Job(object):
 
         ver = 0
         suffix = "-vo2-%03d"
-        self.cfg.name = self.make_log_dir(self.cfg.log, self.cfg.name, suffix, ver)
-        if not self.cfg.name:
-            sys.stderr.write("Failed to create logging directories in: %s\n" % self.cfg.log)
-            return False
+        if not os.path.isdir(self.cfg.log):
+            #self.cfg.name = self.make_log_dir_version(self.cfg.log, self.cfg.name, suffix, ver)
+            self.cfg.name = self.make_log_dir(self.cfg.log)
+            if not self.cfg.name:
+                log.error("Failed to create logging directories in: %s" % self.cfg.log)
+                return False
 
         return True
 
@@ -27,12 +30,28 @@ class Job(object):
         try:
             self.tool = import_module(self.cfg.host_tool)
         except ImportError as e:
-            sys.stderr.write("Job failed to import specified tool: %s\n\t%s\n" % (self.cfg.host_tool, e))
+            log.error("Job failed to import specified tool: %s\n\t%s" % (self.cfg.host_tool, e))
             return False
         else:
             return True
 
-    def make_log_dir(self, dir_, name, sfx, ver):
+    def make_log_dir(self, dir_):
+        made = False
+        old_mask = os.umask(0007)
+        try:
+            os.makedirs(dir_, 0770)
+        except OSError as e:
+            if e.errno is 17:
+                pass
+            else:
+                n = ''
+                log.error("Job: error making log dir: %s" % e)
+        else:
+            made = True
+        os.umask(old_mask)
+        return made
+
+    def make_log_dir_version(self, dir_, name, sfx, ver):
         made = False
         old_mask = os.umask(0007)
         while not made:
@@ -45,7 +64,7 @@ class Job(object):
                     ver += 1
                 else:
                     n = ''
-                    sys.stderr.write("Job error making log dir: %s\n" % e)
+                    log.error("Job error making log dir: %s" % e)
                     break
             else:
                 made = True
