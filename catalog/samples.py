@@ -19,6 +19,7 @@ class Sample(object):
         self.type = Sample.NEW
         if path:
             self.set_type(path)
+        self.logdir = os.path.join(name[0:2], name[0:4], name)
 
     def set_type(self, path):
         if not os.path.isfile(path):
