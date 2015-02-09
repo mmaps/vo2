@@ -27,9 +27,10 @@ class Task(object):
         mask = os.umask(0007)
         try:
             os.makedirs(self.logdir, 0770)
-        except OSError:
-            logging.error("TASK unable to create log directory: %s" % self.logdir)
-            return False
+        except OSError as e:
+            if e.errno is not 17:
+                logging.error("TASK unable to create log directory: %s" % self.logdir)
+                return False
         os.umask(mask)
 
         try:
