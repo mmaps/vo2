@@ -4,6 +4,8 @@
 - Python 2.7
 - VirtualBox
 - Intel's PIN
+- libmagic
+  - Mac: $ brew install libmagic --with-python
 
 ## Installation
 
