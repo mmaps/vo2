@@ -1,2 +1,3 @@
 *.pyc
-remote/keys/voo*
+remote/keys/*.ppk
+*.swp
