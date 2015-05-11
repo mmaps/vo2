@@ -24,6 +24,8 @@ def get_file_samples(fpath):
         sys.exit(1)
     else:
         for line in fin:
+            if line.startswith("#"):
+                continue
             path = line.rstrip()
             name = os.path.basename(path)
             rv.append(Sample(name, path))
@@ -40,13 +42,7 @@ parser.add_argument('-c', '--config',
         default=VCFG)
 parser.add_argument('-d', '--debug', action='store_true')
 
-
-try:
-    args = parser.parse_args()
-except SystemExit:
-    parser.print_help()
-    sys.exit(0)
-
+args = parser.parse_args()
 
 if args.debug:
     log.basicConfig(level=log.DEBUG)
@@ -100,7 +96,6 @@ job = Job(samples, job_cfg_ns)
 if not job.setup():
     log.error("Job setup failed")
     sys.exit(1)
-
 
 host_vms = sorted([vm.rstrip() for vm in vcfg_ns.vms.split(',')])
 vm_settings = dict(zip(host_vms, [getattr(vcfg_ns, vm) for vm in host_vms]))

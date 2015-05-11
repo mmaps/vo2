@@ -61,10 +61,10 @@ class Scheduler(object):
             task = Task(self.job.cfg, vm, job.name, job.path)
             print "%s" % task
             POOL.apply_async(self.job.tool.run, (task,), callback=self.job.tool.callback)
+        log.debug("All jobs assigned in scheduler engine")
         self.cleanup()
 
     def maintain(self):
-        global POOL
         vms = []
         while not self.vm_queue.empty():
             try:

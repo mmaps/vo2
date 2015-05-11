@@ -38,8 +38,9 @@ class Job(object):
     def make_log_dir(self, dir_):
         made = False
         old_mask = os.umask(0007)
+        log.debug("Making log directory: %s" % dir_)
         try:
-            os.makedirs(dir_, 0770)
+            os.makedirs(log_path, 0770)
         except OSError as e:
             if e.errno is 17:
                 pass
