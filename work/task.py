@@ -122,7 +122,7 @@ class Task(object):
     def get_results(self, src, dst):
         dst = os.path.join(self.logdir, dst)
         self.log("TASK Get results dst: %s" % dst)
-        self.vm.winscp_pull(src, dst)
+        self.vm.pull(self.cfg.copyprogram, self.cfg.user, src, dst)
         return os.path.isfile(dst)
 
     def teardown_vm(self):
@@ -143,7 +143,7 @@ class Task(object):
         src = self.sample.path
         dst = "%s\\%s" % (self.cfg.guestworkingdir, repr(self.sample))
         self.log("TASK: Pushing sample\n\t\tTASK: src %s\n\t\tTASK: dst %s" % (src, dst))
-        return self.vm.winscp_push(src, dst)
+        return self.vm.push(self.cfg.copyprogram, self.cfg.user, src, dst)
 
     def complete(self):
         try:

@@ -209,41 +209,61 @@ class VirtualMachine(object):
             self.error(err)
         return rv
 
-    def winscp_push(self, src, dst):
+    def push(self, type_, user, src, dst):
+        if type_ == "winscp":
+            rv = self.winscp_push(user, src, dst)
+        elif type_ == "pscp":
+            rv = self.pscp_push(user, src, dst)
+        else:
+            sys.stderr.write("Unknown push method: %s\n" % type_)
+            rv = False
+        return rv
+    
+    def pull(self, type_, user, src, dst):
+        if type_ == "winscp":
+            self.winscp_pull(user, src, dst)
+        elif type_ == "pscp":
+            rv = self.pscp_pull(user, src, dst)
+        else:
+            sys.stderr.write("Unknown pull method: %s\n" % type_)
+            rv = False
+        return rv
+
+    def winscp_push(self, user, src, dst):
         self.debug("winscp_push: %s -> %s\n" % (src, dst))
         cmd = [EXEDIR + '\\winscp.exe',
                '/console', '/command',
                '"option confirm off"',
                '"option batch abort"',
-               '"open %s@%s -hostkey=* -privatekey=%s"' % (USER, self.host_addr, KEY),
+               '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.host_addr, KEY),
                '"get %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
         return self.guest_cmd(cmd)
 
-    def winscp_pull(self, src, dst):
+    def winscp_pull(self, user, src, dst):
         self.debug("winscp_pull: %s -> %s\n" % (src, dst))
         cmd = [EXEDIR + '\\winscp.exe',
                '/console', '/command',
                '"option confirm off"',
                '"option batch abort"',
-               '"open %s@%s -hostkey=* -privatekey=%s"' % (USER, self.host_addr, KEY),
+               '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.host_addr, KEY),
                '"put -nopreservetime -transfer=binary %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
         return self.guest_cmd(cmd)
 
-    def pscp_pull(self, src, dst):
+    def pscp_pull(self, user, src, dst):
         if not self.guest:
             return False
-        cmd = 'echo y | "%s" -r -i "%s" %s@%s:"%s" "%s"' % (PSCP, KEY, USER, self.host_addr, src, dst)
+        cmd = 'echo y | "%s" -r -i "%s" %s@%s:"%s" "%s"' % (PSCP, KEY, user, self.host_addr, src, dst)
         self.debug(cmd)
         return self.guest.execute(cmd)
 
-    def pscp_push(self, src, dst):
+    def pscp_push(self, user, src, dst):
         if not self.guest:
             return False
-        cmd = 'echo y | "%s" -i "%s" "%s" %s@%s:"%s"' % (PSCP, KEY, src, USER, self.host_addr, dst)
+        cmd = 'echo y | "%s" -i "%s" "%s" %s@%s:"%s"' % (PSCP, KEY, src, user, self.host_addr, dst)
         self.debug(cmd)
         return self.guest.execute(cmd)
 
