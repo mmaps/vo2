@@ -1,0 +1,30 @@
+[job]
+name = retesting
+# desc = pin-2.11-49306-msvc10_xpsp3_x86_V5
+type = analysis
+#vms = xp00,xp01,xp02,xp03,xp04,xp05,xp06,xp07,xp08,xp09
+vms = xp05_1
+host_tool = tools.pin
+
+#jobdir = /Volumes/Macintosh_HD_2/voodo_src/mal_code/e_data
+#jobdir = /Volumes/Macintosh_HD_2/voodo_src/mal_code/e-data-fails
+jobfile = testfiles.txt
+log = /Volumes/Macintosh_HD_2/voodo_log
+#outputdir = /Volumes/Macintosh_HD_2/voodo_log
+guestworkingdir = c:\\malware\\
+
+pincmd = {pinbat} -t "{pintool}"
+pintool = c:\\pin-2.11-49306-msvc10-ia32_intel64-windows\\source\\tools\\SimpleExamples\\obj-ia32\\v5.dll
+pinbat = c:\\pin-2.11-49306-msvc10-ia32_intel64-windows\\pin.bat
+
+#spoofs = rundll32.exe,McpRoXy.exe,java.exe,svchost.exe,iexplore.exe,regsvr32.exe
+spoofs = rundll32.exe
+spoofdir = c:\\malware\\spoofs
+
+exectime = 30
+pdfreader = C:\Program Files\Adobe\Reader 8.0\Reader\AcroRd32.exe
+pinlog = V3.out
+pcap =
+user = traceml
+copyprogram = winscp
+#copyprogram = pscp
