@@ -97,12 +97,16 @@ if not job.setup():
     log.error("Job setup failed")
     sys.exit(1)
 
+
 host_vms = sorted([vm.rstrip() for vm in vcfg_ns.vms.split(',')])
 vm_settings = dict(zip(host_vms, [getattr(vcfg_ns, vm) for vm in host_vms]))
+
+
 gmgr = gman.GuestManager(host_vms, vm_settings)
 gmgr.populate_map(vm_settings)
 gmgr.fill_pool(gmgr.vm_map)
 gmgr.checking(start=True)
+
 
 scheduler = Scheduler(job, gmgr)
 scheduler.start()
