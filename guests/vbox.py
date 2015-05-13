@@ -221,7 +221,7 @@ class VirtualMachine(object):
     
     def pull(self, type_, user, src, dst):
         if type_ == "winscp":
-            self.winscp_pull(user, src, dst)
+            rv = self.winscp_pull(user, src, dst)
         elif type_ == "pscp":
             rv = self.pscp_pull(user, src, dst)
         else:
