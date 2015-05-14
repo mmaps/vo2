@@ -23,6 +23,8 @@ ABORTED = 3
 
 class VirtualMachine(object):
 
+    rpc_max_try = 2
+
     def __init__(self, name, addr, port, host_addr):
         """
         :type self.msgs: multiprocessing.Queue
@@ -189,7 +191,7 @@ class VirtualMachine(object):
 
     def ping_agent(self):
         if self.connect():
-            return self.guest.ping()
+            return self.guest_cmd("\r\n\r\nHost Connected\r\n\r\n", 1)
 
     def release(self):
         """
@@ -200,13 +202,25 @@ class VirtualMachine(object):
         except (AttributeError, Full):
             sys.stderr.write("%s: unable to signal completion to VM manager. Messages queue not set\n" % self.name)
 
-    def guest_cmd(self, cmd):
+    def guest_cmd(self, cmd, exec_time=30, verbose=False, working_dir=''):
         self.debug("guest_cmd: %s\n" % cmd)
-        rv, out, err = self.guest.execute(cmd)
-        if out:
-            self.debug(out)
-        if err:
-            self.error(err)
+
+        rv = False
+        rpc_num_try = 0
+
+        while not rv and rpc_num_try < self.rpc_max_try:
+            try:
+                rv, out, err = self.guest.execute(cmd, exec_time, verbose, working_dir)
+            except Exception as e:
+                self.error("Error executing RPC on %s\n\t%s\n\t%s" % (self, cmd, e))
+            else:
+                if out:
+                    self.debug(out)
+                if err:
+                    self.error(err)
+            finally:
+                if not rv:
+                    rpc_num_try += 1
         return rv
 
     def push(self, type_, user, src, dst):
