@@ -94,7 +94,7 @@ class Task(object):
                 self.log("TASK: Unable to start PCAP")
 
         self.log("TASK execute: %s" % cmd)
-        rv = self.vm.guest.execute(cmd, execution_time, True, working_dir)
+        rv = self.vm.guest_cmd(cmd, execution_time, True, working_dir)
 
         if self.cfg.pcap:
             if not self.vm.stop_sniff():
