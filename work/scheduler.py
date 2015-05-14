@@ -1,5 +1,6 @@
 # Python Modules
 import signal
+import sys
 import threading
 import logging as log
 from multiprocessing import Pool
@@ -14,7 +15,10 @@ POOL = None
 def sigint_handler(signum, frame):
     print 'Shutting down'
     POOL.terminate()
+    """
+    Trying to make this work by removing close
     POOL.close()
+    """
 
 
 class Scheduler(object):
@@ -61,7 +65,7 @@ class Scheduler(object):
             task = Task(self.job.cfg, vm, job.name, job.path)
             print "%s" % task
             POOL.apply_async(self.job.tool.run, (task,), callback=self.job.tool.callback)
-        log.debug("All jobs assigned in scheduler engine")
+        sys.stdout.write("All jobs assigned in scheduler engine\n")
         self.cleanup()
 
     def maintain(self):
