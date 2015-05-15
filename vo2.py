@@ -3,6 +3,7 @@ import os
 import sys
 import logging as log
 from collections import namedtuple
+from ConfigParser import ConfigParser
 from time import sleep
 
 from vcfg import Config
@@ -11,7 +12,8 @@ from vlibs.scandir import scandir
 from work.scheduler import Scheduler
 from work.job import Job
 
-VCFG = 'conf/myfirstconf.cfg'
+VCFG = 'conf/vo2.cfg'
+
 Sample = namedtuple('Sample', 'name path')
 
 
@@ -58,15 +60,17 @@ if not os.path.exists(args.config):
 
 
 job_cfg = Config(args.job)
-if not job_cfg.parsed:
-    log.error("Bad job_cfg file failed to parse: %s" % args.job)
+if not job_cfg.parse():
+    log.error("Bad job_cfg file, failed to parse: %s" % args.job)
     sys.exit(1)
 
 vo2_cfg = Config(args.config)
-if not vo2_cfg.parsed:
-    log.error("Bad vcfg file failed to parse: %s" % args.config)
+if not vo2_cfg.parse():
+    log.error("Bad vcfg file, failed to parse: %s" % args.config)
     sys.exit(1)
 
+print str(vo2_cfg)
+sys.exit(1)
 
 if job_cfg.jobdir: 
     if not os.path.isdir(job_cfg.jobdir):
@@ -87,11 +91,6 @@ if not samples:
     sys.exit(1)
 
 
-log.info("VO2 Config: %s\tJob Config: %s" % (vo2_cfg, job_cfg))
-job_cfg_ns = job_cfg.namespace()
-vcfg_ns = vo2_cfg.namespace()
-
-
 job = Job(samples, job_cfg_ns)
 if not job.setup():
     log.error("Job setup failed")
@@ -99,7 +98,7 @@ if not job.setup():
 
 
 host_vms = sorted([vm.rstrip() for vm in vcfg_ns.vms.split(',')])
-vm_settings = dict(zip(host_vms, [getattr(vcfg_ns, vm) for vm in host_vms]))
+#vm_settings = dict(zip(host_vms, [getattr(vcfg_ns, vm) for vm in host_vms]))
 
 
 gmgr = gman.GuestManager(host_vms, vm_settings)
