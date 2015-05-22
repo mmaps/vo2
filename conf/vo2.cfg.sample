@@ -1,6 +1,11 @@
 [general]
+log_root = /Volumes/Macintosh_HD_2/vo2
+interaction = 1
 
 [timeouts]
+# Time to wait for a free task slot for a new sample
+task_wait = 300
+
 # Time to wait for VM to start up
 vm_start = 180
 

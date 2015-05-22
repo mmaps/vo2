@@ -5,7 +5,7 @@ from xmlrpclib import ServerProxy
 from threading import Thread
 from Queue import Full
 
-from vlibs.proc_mgmt import ProcMgr
+from libs.proc_mgmt import ProcMgr
 
 CMD = r'/usr/bin/VBoxManage'
 EXEDIR = r'c:\remote\bin'
@@ -26,15 +26,6 @@ class VirtualMachine(object):
     rpc_max_try = 2
 
     def __init__(self, name, addr, port, host_addr):
-        """
-        :type self.msgs: multiprocessing.Queue
-        :type self.guest: vo2.net.guest.EvalServer
-        :return:
-        """
-        self.name = name
-        self.addr = addr
-        self.host_addr = host_addr
-        self.port = port
         self.proc = ProcMgr()
         self.msgs = None
         self.guest = None
@@ -42,6 +33,11 @@ class VirtualMachine(object):
         self.state = -1
         self.state_str = ''
         self.busy = False
+
+        self.name = name
+        self.addr = addr
+        self.host_addr = host_addr
+        self.port = port
 
     def start(self):
         self.debug("Start %s [%s:%s]" % (self.name, self.addr, self.port))
@@ -53,7 +49,7 @@ class VirtualMachine(object):
             self.debug("needs to be shut down")
             return False
 
-        cmd = [CMD, 'startvm', self.name]
+        cmd = [CMD, 'startvm', self.name, '--type', 'headless']
         self.debug("starting: %s" % cmd)
         if self.proc.exec_quiet(cmd) != 0:
             self.error('start failure: %s' % cmd)
@@ -71,7 +67,7 @@ class VirtualMachine(object):
         t = Thread(target=self._wait_agent)
         t.daemon = True
         t.start()
-        t.join(30)
+        t.join(self.cfg.wait)
         if t.is_alive():
             self.debug("timeout waiting for agent")
             self.poweroff()
@@ -187,11 +183,11 @@ class VirtualMachine(object):
     def _wait_agent(self):
         while not self.ping_agent():
             self.ping_agent()
-            sleep(.5)
+            sleep(1)
 
     def ping_agent(self):
         if self.connect():
-            return self.guest_cmd("\r\n\r\nHost Connected\r\n\r\n", 1)
+            return self.guest_cmd("echo \r\n\r\nHost Connected\r\n\r\n", 1)
 
     def release(self):
         """
@@ -212,7 +208,13 @@ class VirtualMachine(object):
             try:
                 rv, out, err = self.guest.execute(cmd, exec_time, verbose, working_dir)
             except Exception as e:
-                self.error("Error executing RPC on %s\n\t%s\n\t%s" % (self, cmd, e))
+                if e.errno == 61:
+                    """
+                    Connection Refused, this is expected if the guest is loading
+                    """
+                    pass
+                else: 
+                    self.error("Error executing RPC on %s\n\t%s\n\t%s" % (self, cmd, e))
             else:
                 if out:
                     self.debug(out)
