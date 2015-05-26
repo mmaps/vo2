@@ -1,5 +1,3 @@
-# Python Modules
-import signal
 import logging
 import multiprocessing as mp
 import Queue
@@ -8,10 +6,6 @@ import control
 
 
 MAXQUEUE = 1000
-
-
-def sigint_handler(signum, frame):
-    print "Interrupted..."
 
 
 class Scheduler(object):
@@ -27,13 +21,15 @@ class Scheduler(object):
         vms = self.vm_factory.list()
         self.log.debug("Init controllers for: %s" % vms)
         for vm in vms:
-            if vm in self.job.cfg.vms:
-                vm = self.vm_factory.get(vm)
-                if vm:
-                    ctrl = control.TaskController(self.job.cfg, vm, self.task_queue)
-                    self.task_controllers.append(ctrl)
-                else:
-                    self.log.error("Unable to instanciate VM: '%s'" % vm)
+            self.make_controller(vm)
+
+    def make_controller(self, vm):
+        vm = self.vm_factory.get(vm)
+        if vm:
+            ctrl = control.TaskController(self.job.cfg, vm, self.task_queue)
+            self.task_controllers.append(ctrl)
+        else:
+            self.log.error("Unable to instanciate VM: '%s'" % vm)
 
     def start(self):
         self.log.info("Initializing..")
@@ -64,10 +60,10 @@ class Scheduler(object):
 
     def add_sample(self, sample):
         try:
-            self.task_queue.put(sample, block=True, timeout=self.job.vo2_cfg.task_wait)
+            self.task_queue.put(sample, block=True, timeout=self.job.cfg.get_float("timeouts", "task_wait"))
         except Queue.Full:
             self.log.error("Timed out waiting for free task slot. VM's may be frozen")
-            self.kill_controllers()
+            self.kill_controllers(self.task_controllers)
 
     def cleanup(self):
         self.log.debug("Beginning scheduler cleanup...")

@@ -138,6 +138,9 @@ class VirtualMachine(object):
                 elif st == 'aborted':
                     self.state = ABORTED
                     self.state_str = 'aborted'
+                else:
+                    self.state = UNKNOWN
+                    self.state_str = 'unknown'
                 return self.state
 
     def start_sniff(self):

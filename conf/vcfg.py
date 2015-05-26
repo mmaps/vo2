@@ -1,63 +1,70 @@
+import ConfigParser
 import logging
-from ConfigParser import SafeConfigParser, MissingSectionHeaderError
-
-
-class Namespace(object):
-
-    def __str__(self):
-        attrs = []
-        for attr_name in dir(self):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, Namespace):
-                attrs.append("[%s]\n%s" % (attr_name, attr))
-            elif not attr_name.startswith("__"):
-                attrs.append("\t%s" % attr_name)
-        return "\n".join(attrs)
-
-    def __getattr__(self, item):
-        return None
 
 
 class Config(object):
-
     def __init__(self):
-        self.sections = {}
         self.log = logging.getLogger('vo2.%s' % __name__)
+        self.parsed_cfgs = []
+        self.sections = {}
 
     def load(self, cfg_path):
         self.log.debug("Loading %s" % cfg_path)
-        parser = SafeConfigParser(allow_no_value=True)
-        parsed = self.parse(parser, cfg_path)
-        if not parsed:
+        config = ConfigParser.SafeConfigParser(allow_no_value=True)
+        self.parsed_cfgs.extend(self.parse(config, cfg_path))
+        if not self.parsed_cfgs:
             self.log.warn("Bad or empty config file: %s" % cfg_path)
-        else:
-            self.make_namespaces(parser)
-        return parsed
+            return False
+        return True
+
+    def add_settings(self, cfg):
+        for section, settings in cfg.sections.items():
+            self.sections[section] = settings
 
     def parse(self, parser, cfg_path):
+        rv = None
         try:
-            parsed = parser.read(cfg_path)
-        except MissingSectionHeaderError as e:
+            rv = parser.read(cfg_path)
+        except ConfigParser.MissingSectionHeaderError as e:
             self.log.error("Missing section headers in %s" % cfg_path)
+        else:
+            self.make_settings_dict(parser)
+        finally:
+            return rv
+
+    def make_settings_dict(self, parser):
+        for section in parser.sections():
+            self.sections[section] = dict(parser.items(section))
+            self.log.debug("%s: %s" % (section, self.sections[section]))
+
+    def get(self, section, key):
+        try:
+            value = self.sections[section].get(key)
+        except AttributeError:
+            self.log.debug("Unknown section: %s" % section)
             return None
         else:
-            return parsed
+            return value
 
-    def make_namespaces(self, parser):
-        for section in parser.sections():
-            sect_ns = Namespace()
-            self.sections[section] = sect_ns
-            for name, value in parser.items(section):
-                value = value.rstrip(r'\/')
-                self.log.debug("Cfg Namespace [%s][%s]: '%s'" % (section, name, value))
-                setattr(sect_ns, name, value)
+    def get_bool(self, section, key):
+        value = self.get(section, key)
+        return value is not None and (value is 1 or value.lower() == "yes"
+                                      or value.lower() == "true" or value.lower() == "on")
+
+    def get_float(self, section, key):
+        value = self.get(section, key)
+        try:
+            value = float(value)
+        except ValueError:
+            self.log.error("Could not coerce [%s]%s to float" % (section, key))
+            return None
+        else:
+            return value
 
     def set(self, section, key, value):
         self.log.debug("Setting [%s][%s]: %s" % (section, key, value))
-        setattr(self.sections[section], key, value)
-
-    def get_namespace(self, name):
-        return self.sections.get(name)
+        #setattr(self.sections[section], key, value)
+        self.sections[section][key]=value
 
     def find_all(self, match):
         self.log.debug("Searching config for: %s" % match)

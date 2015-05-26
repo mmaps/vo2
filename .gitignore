@@ -2,4 +2,5 @@
 remote/keys/*.ppk
 *.swp
 *.iso
+.idea/*
 

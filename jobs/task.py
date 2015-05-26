@@ -5,83 +5,70 @@ from time import sleep, strftime, localtime
 
 from catalog.samples import Sample
 from guests import vbox
+from util import files
 
 
 class Task(object):
-    def __init__(self, cfg, sample):
+
+    def __init__(self, cfg, vm, sample):
         """
         :type cfg: vo2.vcfg.Config
         """
         self.cfg = cfg
         self.vm = vm
-        self.logfile = None
-        self.retval = False
         self.sample = sample
-        self.logdir = os.path.join(cfg.log, self.sample.logdir)
-        self.errors = []
+        self.logdir = ''
+        self.logfile = sys.stderr
+        self.retval = False
 
-    def init(self):
-        mask = os.umask(0000)
-        try:
-            os.makedirs(self.logdir, 0777)
-        except OSError as e:
-            if e.errno is not 17:
-                logging.error("TASK unable to create log directory: %s" % self.logdir)
-                return False
-        os.umask(mask)
-
-        try:
-            logpath = os.path.join(self.logdir, "%s.%s.log" % (self.sample.name, self.vm.name))
-        except AttributeError:
-            logpath = os.path.join(self.logdir, "%s.log" % self.vm.name)
-
-        try:
-            self.logfile = open(logpath, 'w')
-        except IOError:
-            sys.stderr.write("Unable to create log file: %s\n" % logpath)
+    def init_task_log(self):
+        self.logdir = self.init_logdir(self.sample.logdir)
+        if not self.logdir:
             return False
+        logfile = self.open_task_log(self.logdir, self.sample.name, self.vm.name)
+        if not logfile:
+            return False
+        self.logfile = logfile
+        return True
+
+    def init_logdir(self, sub_path):
+        root_path = self.cfg.get("general", "log_root")
+        path = os.path.join(root_path, sub_path)
+        if files.make_log_dir(path):
+            return path
         else:
-            self.log("-- BEGIN LOG --\nTASK VM: %s" % self.vm.name)
-            if self.vm.update_state() is vbox.RUNNING:
-                self.vm.poweroff()
-            self.log("TASK Initial VM State: %s" % self.vm)
-            self.log("TASK Sample: %s" % self.sample)
-            return True
+            return None
 
-    def setup_vm(self, suffix=''):
-        self.log("TASK: Setup VM: %s" % self.vm)
-        self.vm.busy = True
+    def open_task_log(self, path, sample, vm):
+        logpath = os.path.join(path, "%s.%s.txt" % (sample, vm))
+        try:
+            logfile = open(logpath, "w")
+        except IOError as e:
+            self.log("TASK: Error creating task log: %s" % e)
+            logfile = None
+        return logfile
+
+    def reset_vm(self):
         self.vm.update_state()
-
-        self.log("TASK: Updated VM: %s" % self.vm)
-
         if self.vm.state is vbox.RUNNING:
             self.log("TASK: Setup Powering off VM")
             self.vm.poweroff()
-
         if self.vm.state is not vbox.SAVED:
             self.log("TASK: Setup Restoring VM")
-            self.vm.restore(self.cfg.snapshot)
+            self.vm.restore(self.cfg.get("job", "snapshot"))
 
-        self.log("TASK: Starting, %s" % self.vm)
-        rv = self.vm.start()
-        if not rv:
-            self.log("TASK: Failed to start VM: %s" % self.vm)
-            return False
-
-        self.log("TASK: Started, %s" % self.vm)
-
-        if self.sample.filetype is not Sample.NEW:
-            rv = self.load_sample()
-
-        if self.cfg.pcap:
+    def setup_pcap(self, name_suffix=''):
+        if self.cfg.get_bool("job", "pcap"):
             self.log("TASK: PCAP enabled")
             self.vm.stop_sniff()
-            pcap_path = os.path.join(self.logdir, '%s%s.pcap' % (self.sample.name, suffix))
+            pcap_path = os.path.join(self.logdir, '%s%s.pcap' % (self.sample.name, name_suffix))
             self.log("TASK: PCAP file: %s" % pcap_path)
             self.vm.set_pcap(pcap_path)
 
-        return rv
+    def start_vm(self):
+        if not self.vm.start():
+            self.log("TASK: Failed to start VM: %s" % self.vm)
+            return False
 
     def run_sample(self, cmd, execution_time, working_dir):
         self.log("TASK RUN SAMPLE ENTRY")
@@ -150,8 +137,6 @@ class Task(object):
 
     def close_log(self):
         if self.logfile:
-            for e in self.errors:
-                self.logfile.write(e)
             self.log("-- END LOG --")
             self.logfile.close()
 
@@ -168,7 +153,7 @@ class Task(object):
 
     def __str__(self):
         try:
-            s = "Task\n\tSample: %s\n\tVM: %s\n\tCfg: %s\n" % (self.sample.path, self.vm.name, self.cfg.name)
+            s = "Task\n\tSample: %s\n\tVM: %s\n\tCfg: %s\n" % (self.sample.path, self.vm.name, self.cfg.get("job", "name"))
         except AttributeError:
-            s = "Task\n\tVM: %s\n\tCfg: %s\n" % (self.vm.name, self.cfg.name)
+            s = "Task\n\tVM: %s\n\tCfg: %s\n" % (self.vm.name, self.cfg.get("job", "name"))
         return s

@@ -4,6 +4,7 @@ import os
 from libs.scandir import scandir
 from util import files
 
+
 class SampleSet(object):
 
     def __init__(self):

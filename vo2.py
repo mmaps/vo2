@@ -9,6 +9,7 @@ from conf.vcfg import Config
 from util import logs
 
 VCFG = "conf/vo2.cfg"
+VCFG_VM_KEY = "g_"
 
 log = None
 
@@ -37,20 +38,29 @@ def load_config(cfg_file):
 if __name__ == "__main__":
     cli_args = parse_cli_args()
     log = logs.init_logging("vo2", cli_args.debug)
-    log.info("VO2 Start")
+    log.info("VO2 Script Start")
 
     vo2_cfg = load_config(cli_args.vo2_cfg)
+    vo2_cfg.set("general", "debug", cli_args.debug)
+
     job_cfg = load_config(cli_args.job_cfg)
     job_cfg.set("job", "debug", cli_args.debug)
 
-    job = Job(vo2_cfg.get_namespace("general"), job_cfg.get_namespace("job"))
+    cfg = Config()
+    cfg.add_settings(vo2_cfg)
+    cfg.add_settings(job_cfg)
+
+    job = Job(cfg)
     if not job.setup():
-        log.error("Failed to create job")
+        log.error("Failed to create job. Exiting.")
         sys.exit(1)
 
-    vm_factory = Factory(vo2_cfg)
+    vm_factory = Factory(vo2_cfg.find_all(VCFG_VM_KEY))
+    job_vms = job_cfg.get("job", "vms")
+    if job_vms:
+        vm_factory.use_vms(job_vms.split(","))
 
     scheduler = Scheduler(job, vm_factory)
     scheduler.start()
 
-    log.info("VO2 Exiting")
+    log.info("VO2 Script End")

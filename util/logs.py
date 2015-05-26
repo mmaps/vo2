@@ -14,3 +14,4 @@ def init_logging(name, debug=False):
     log.addHandler(console_hdlr)
     log.debug("Debugging on")
     return log
+
