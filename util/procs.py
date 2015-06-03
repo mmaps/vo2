@@ -7,7 +7,7 @@ from subprocess import Popen, PIPE
 from threading import Thread
 
 
-class ProcMgr(object):
+class ProcessManager(object):
     
     def __init__(self):
         #self.devnull = open(os.devnull, 'w')
