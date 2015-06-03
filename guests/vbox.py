@@ -5,7 +5,9 @@ from xmlrpclib import ServerProxy
 from threading import Thread
 from Queue import Full
 
-from libs.proc_mgmt import ProcMgr
+from util.procs import ProcessManager
+from virtdev import VirtualDevice
+
 
 CMD = r'/usr/bin/VBoxManage'
 EXEDIR = r'c:\remote\bin'
@@ -14,30 +16,16 @@ KEY = r'c:\remote\keys\voo_priv.ppk'
 PSCP = r'c:\remote\bin\pscp.exe'
 WINSCP = r'c:\remote\bin\winscp.exe'
 
-UNKNOWN = -1
-POWEROFF = 0
-SAVED = 1
-RUNNING = 2
-ABORTED = 3
 
+class VirtualMachine(VirtualDevice):
 
-class VirtualMachine(object):
+    proc = ProcessManager()
 
-    rpc_max_try = 2
+    def launch(self):
+        pass
 
-    def __init__(self, name, addr, port, host_addr):
-        self.proc = ProcMgr()
-        self.msgs = None
-        self.guest = None
-        self.sniff = False
-        self.state = -1
-        self.state_str = ''
-        self.busy = False
-
-        self.name = name
-        self.addr = addr
-        self.host_addr = host_addr
-        self.port = port
+    def restart(self):
+        pass
 
     def start(self):
         self.debug("Start %s [%s:%s]" % (self.name, self.addr, self.port))
@@ -45,7 +33,7 @@ class VirtualMachine(object):
         self.update_state()
         self.debug("current state: %s" % self.state_str)
 
-        if self.state is RUNNING:
+        if self.is_running():
             self.debug("needs to be shut down")
             return False
 
@@ -88,7 +76,7 @@ class VirtualMachine(object):
     def restore(self, name=''):
         self.debug("Checking state for restore")
         self.update_state()
-        if self.state is POWEROFF or self.state is ABORTED:
+        if self.is_off() or self.is_aborted():
             self.debug("Attempting restore")
             cmd = [CMD, 'snapshot', self.name]
             if name:
@@ -120,26 +108,26 @@ class VirtualMachine(object):
         pid = self.proc.execute(cmd)
         out, err = self.proc.get_output(pid)
         if not out:
-            self.state = UNKNOWN
+            self.state = self.UNKNOWN
             self.state_str = 'unknown'
             return self.state
         for line in out.split('\n'):
             if line.startswith('VMState='):
                 st = line.partition('=')[2].strip('"')
                 if st == 'running':
-                    self.state = RUNNING
+                    self.state = self.RUNNING
                     self.state_str = 'running'
                 elif st == 'saved':
-                    self.state = SAVED
+                    self.state = self.SAVED
                     self.state_str = 'saved'
                 elif st == 'poweroff':
-                    self.state = POWEROFF
+                    self.state = self.POWEROFF
                     self.state_str = 'poweroff'
                 elif st == 'aborted':
-                    self.state = ABORTED
+                    self.state = self.ABORTED
                     self.state_str = 'aborted'
                 else:
-                    self.state = UNKNOWN
+                    self.state = self.UNKNOWN
                     self.state_str = 'unknown'
                 return self.state
 
@@ -254,7 +242,7 @@ class VirtualMachine(object):
                '/console', '/command',
                '"option confirm off"',
                '"option batch abort"',
-               '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.host_addr, KEY),
+               '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.gateway, KEY),
                '"get %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
@@ -266,7 +254,7 @@ class VirtualMachine(object):
                '/console', '/command',
                '"option confirm off"',
                '"option batch abort"',
-               '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.host_addr, KEY),
+               '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.gateway, KEY),
                '"put -nopreservetime -transfer=binary %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
@@ -275,14 +263,14 @@ class VirtualMachine(object):
     def pscp_pull(self, user, src, dst):
         if not self.guest:
             return False
-        cmd = 'echo y | "%s" -r -i "%s" %s@%s:"%s" "%s"' % (PSCP, KEY, user, self.host_addr, src, dst)
+        cmd = 'echo y | "%s" -r -i "%s" %s@%s:"%s" "%s"' % (PSCP, KEY, user, self.gateway, src, dst)
         self.debug(cmd)
         return self.guest.execute(cmd)
 
     def pscp_push(self, user, src, dst):
         if not self.guest:
             return False
-        cmd = 'echo y | "%s" -i "%s" "%s" %s@%s:"%s"' % (PSCP, KEY, src, user, self.host_addr, dst)
+        cmd = 'echo y | "%s" -i "%s" "%s" %s@%s:"%s"' % (PSCP, KEY, src, user, self.gateway, dst)
         self.debug(cmd)
         return self.guest.execute(cmd)
 
@@ -306,6 +294,4 @@ class VirtualMachine(object):
     def debug(self, msg):
         logging.debug('%s(%s:%s),%s: %s' % (self.name, self.addr, self.port, self.state_str, msg))
 
-    def __str__(self):
-        self.update_state()
-        return "%s[%s:%s], %s => Host: %s" % (self.name, self.addr, self.port, self.state_str, self.host_addr)
+
