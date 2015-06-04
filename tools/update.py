@@ -1,1 +1,2 @@
-__author__ = 'honey'
+def run(task):
+    print "Update tool"

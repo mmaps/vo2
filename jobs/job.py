@@ -1,6 +1,7 @@
 import logging
 
 from catalog import samples
+from jobs import task
 from util import files
 
 
@@ -19,18 +20,22 @@ class Job(object):
         if not files.make_log_dir(root_logdir):
             self.log.error("Failed to create logging directories in: %s" % root_logdir)
             return False
-        if not self.load_samples(self.cfg.get("job", "input")):
-            return False
-        return True
+        return self.load_samples(self.cfg.get("job", "input"))
 
     def load_samples(self, sample_input):
+        rv = False
         try:
-            self.sample_set.add_samples(sample_input)
-        except TypeError as e:
-            self.log.error("Incorrect type of input: %s" % sample_input)
-            return False
-        else:
-            return True
+            rv = self.sample_set.add_samples(sample_input)
+        except TypeError:
+            self.log.error("No samples specified: %s" % sample_input)
+            self.sample_set = xrange(len(self.cfg.get("job", "vms")))
+            rv = True
+        finally:
+            return rv
+
+    def get_task(self):
+        sample = self.get_sample()
+        return task.Task(self.cfg, sample)
 
     def get_sample(self):
         try:

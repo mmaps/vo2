@@ -1,63 +1,68 @@
+import os
+
 from util import files
 
 
-def analyze(task, pincmd, bincmd, execution_time, suffix='pe32'):
-    task.reset_vm()
-    task.setup_pcap(name_suffix=".%s" % suffix)
+def analyze(tsk, pincmd, bincmd, execution_time, suffix='pe32'):
+    """
 
-    bincmd += '"%s\\%s"' % (task.cfg.guestworkingdir, task.sample.name)
+    :type tsk: jobs.task.Task
+    """
+    tsk.setup_vm()
+
+    if tsk.cfg.get_bool("job", "pcap"):
+        tsk.start_pcap(name_suffix=".%s" % suffix)
+
+    bincmd += '"%s"' % tsk.sample.name
     cmd = ' -- '.join([pincmd, bincmd])
-    rv = task.run_sample(cmd, execution_time, task.cfg.guestworkingdir)
-    if not rv:
-        task.teardown_vm()
-        return
+    rv = tsk.vm.launch(cmd, exec_time=execution_time, verbose=True, working_dir=tsk.cfg.get("job", "guestworkingdir"))
 
-    src = '\\'.join([task.cfg.get("job", "guestworkingdir"), task.cfg.get("job", "pinlog")])
-    dst = '%s.%s.txt' % (task.sample.name, suffix)
-    task.retval = task.get_results(src, dst)
-    if not task.retval:
-        src = '\\'.join([task.cfg.guestworkingdir, 'pin.log'])
-        dst = dst.replace(".txt", ".error.txt")
-        task.get_results(src, dst)
+    if rv:
+        src = tsk.cfg.get("job", "pinlog")
+        dst = os.path.join(tsk.logdir, '%s.%s.txt' % (tsk.sample.name, suffix))
+        tsk.vm.pull(tsk.cfg.get("job", "user"), src, dst)
+        if not os.path.isfile(dst):
+            src = tsk.cfg.get("job", "pinerror")
+            dst = dst.replace(".txt", ".error.txt")
+            tsk.vm.pull(tsk.cfg.get("job", "user"), src, dst)
+            rv = False
 
-    task.teardown_vm()
+    tsk.stop_pcap()
+    tsk.teardown_vm()
+    return rv
 
-def run(task):
-    print 'Run'
 
-'''
-def run(task):
+def run(tsk):
     """
 
-    :type task: jobs.task.Task
+    :type tsk: jobs.task.Task
     """
-    task.reset_vm()
-
-    pinbat = task.cfg.get("job", "pinbat")
-    pintool = task.cfg.get("job", "pintool")
-    pincmd = task.cfg.get("job", "pincmd")
-    spoofs = task.cfg.get("job", "spoofs")
-    exec_time = task.cfg.get("job", "exec_time")
-    guest_dir = task.cfg.get("job", "guestworkingdir")
-    pdfreader = task.cfg.get("job", "pdfreader")
+    pinbat = tsk.cfg.get("job", "pinbat")
+    pintool = tsk.cfg.get("job", "pintool")
+    pincmd = tsk.cfg.get("job", "pincmd")
+    spoofs = tsk.cfg.get("job", "spoofs")
+    exec_time = tsk.cfg.get("job", "exec_time")
+    guest_dir = tsk.cfg.get("job", "guestworkingdir")
+    pdfreader = tsk.cfg.get("job", "pdfreader")
 
     pincmd = pincmd.format(pinbat=pinbat, pintool=pintool)
     spoofs = spoofs.split(',')
 
-    if task.sample.type is files.PDF:
+    if tsk.sample.type is files.PDF:
         exec_time *= 2
         bincmd = '"%s" ' % pdfreader
-        analyze(task, pincmd, bincmd, exec_time, 'pdf')
+        rv = analyze(tsk, pincmd, bincmd, exec_time, 'pdf')
 
-    elif task.sample.type is files.DLL:
+    elif tsk.sample.type is files.DLL:
         for s in spoofs:
             bincmd = '"%s\\spoofs\\%s" ' % (guest_dir, s)
-            analyze(task, pincmd, bincmd, exec_time, s)
+            rv = analyze(tsk, pincmd, bincmd, exec_time, s)
 
-    elif task.sample.type is files.EXE:
-        analyze(task, pincmd, '', exec_time)
+    elif tsk.sample.type is files.EXE:
+        rv = analyze(tsk, pincmd, '', exec_time)
 
     else:
-        task.log("RUN fail on unknown file type: %s, %s\n" % (task.sample.name, task.sample.filetype))
+        tsk.log("Tool error: unknown file type: %s, %s\n" % (tsk.sample.name, tsk.sample.filetype))
+        rv = False
 
-'''
+    return rv

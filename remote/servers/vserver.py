@@ -36,10 +36,8 @@ class VServer(object):
             log.info("STDOUT: %s\nSTDERR: %s" % (stdout, stderr))
             qout.put([True, stdout, stderr])
 
-    def execute(self, cmd, timeout=None, verbose=False, work_dir=None):
-        shell = True
-        if isinstance(cmd, list):
-            shell = False
+    def execute(self, cmd, timeout=0, verbose=False, work_dir=None):
+        shell = not isinstance(cmd, list)
 
         target = self.vexec
         if verbose:
@@ -59,20 +57,25 @@ class VServer(object):
             rv = False
             stderr = 'execute error: %s\n%s' % (format_exc(), e)
         else:
+            log.debug("Waiting on process execution: %s sec" % timeout)
             p.join(timeout)
             if p.is_alive():
+                log.debug("Child is alive. Terminating child process")
                 p.terminate()
 
+        log.debug("Gathering results")
         try:
             rv, stdout, stderr = self.results.get(True, 3)
+            log.debug("[RV:\n%s\nSOut:\n%s\nSErr:\n%s]" % rv, stdout, stderr)
         except Empty:
-            pass
+            log.debug("[Empty Results]")
 
         os.chdir(cwd)
 
         return [rv, stdout, stderr]
 
-    def to_work_dir(self, work_dir):
+    @staticmethod
+    def to_work_dir(work_dir):
         try:
             os.chdir(work_dir)
         except OSError as err:

@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 from libs.scandir import scandir
 from util import files
@@ -16,12 +17,15 @@ class SampleSet(object):
 
     def add_samples(self, samples):
         self.log.debug("Adding samples: %s" % samples)
+        rv = True
         if os.path.isdir(samples):
             self.add_dir(samples)
         elif os.path.isfile(samples):
             self.add_file(samples)
         else:
             self.log.error("Could not find file or directory: %s" % samples)
+            rv = False
+        return rv
 
     def add_file(self, fpath):
         self.log.debug("Samples in file, opening")
@@ -45,8 +49,12 @@ class SampleSet(object):
         cnt = 0
         for sample in iter(self):
             cnt += 1
+            sys.stdout.write("Sample %s, Count %d\r" % (sample, cnt))
         self.log.info("Sample set contains %d samples" % cnt)
         self.size = cnt
+
+    def is_empty(self):
+        return self.size == 0
 
     def __iter__(self):
         return self

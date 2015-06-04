@@ -11,18 +11,19 @@ class VirtualDevice(object):
     RUNNING = 2
     ABORTED = 3
 
-    def __init__(self, name, addr, port, gateway):
+    def __init__(self, name):
         self.msgs = None
-        self.guest = None
-        self.sniff = False
+        self._guest = None
         self.state = -1
         self.state_str = ''
         self.busy = False
-
         self.name = name
-        self.addr = addr
-        self.gateway = gateway
-        self.port = port
+        self.addr = ''
+        self.gateway = ''
+        self.port = -1
+        self.rpc_attempts = 2
+        self.timeout_vm = 30
+        self.timeout_job = 180
 
     @abc.abstractmethod
     def start(self):
@@ -57,15 +58,15 @@ class VirtualDevice(object):
         pass
 
     @abc.abstractmethod
-    def push(self):
+    def push(self, user, src, dst):
         pass
 
     @abc.abstractmethod
-    def pull(self):
+    def pull(self, user, src, dst):
         pass
 
     @abc.abstractmethod
-    def launch(self):
+    def launch(self, cmd, exec_time=30, verbose=False, working_dir=''):
         pass
 
     def get_state(self):

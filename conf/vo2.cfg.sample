@@ -1,17 +1,19 @@
 [general]
 log_root = /Volumes/Macintosh_HD_2/vo2
-interaction = 1
+guest_name_prefix = g_
 
 [timeouts]
 # Time to wait for a free task slot for a new sample
 task_wait = 300
 
-# Time to wait for VM to start up
-vm_start = 180
-
 # Number of times to attempt a remote procedure call
-max_rpc_try = 2
+rpc_attempts = 2
 
+# Time to wait for VM to start up
+vm = 180
+
+# Time to wait for a RPC to complete
+rpc = 60
 
 # Guests
 # Every section name that begins with "g_" will be treated as a virtual guest.
@@ -36,12 +38,12 @@ max_rpc_try = 2
 #port = 4828
 #gateway = 10.2.2.1
 #headless = 1
-#[g_xp03]
-#type = vbox
-#os = xpsp3
-#address = 10.3.3.100
-#port = 4828
-#gateway = 10.3.3.1
+[g_xp03]
+type = vbox
+os = xpsp3
+address = 10.3.3.100
+port = 4828
+gateway = 10.3.3.1
 #[g_xp04]
 #type = vbox
 #os = xpsp3

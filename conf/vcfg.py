@@ -46,6 +46,9 @@ class Config(object):
         else:
             return value
 
+    def get_section(self, section):
+        return self.sections.get(section)
+
     def get_bool(self, section, key):
         value = self.get(section, key)
         return value is not None and (value is 1 or value.lower() == "yes"
@@ -63,8 +66,7 @@ class Config(object):
 
     def set(self, section, key, value):
         self.log.debug("Setting [%s][%s]: %s" % (section, key, value))
-        #setattr(self.sections[section], key, value)
-        self.sections[section][key]=value
+        self.sections[section][key] = value
 
     def find_all(self, match):
         self.log.debug("Searching config for: %s" % match)

@@ -21,9 +21,6 @@ class VirtualMachine(VirtualDevice):
 
     proc = ProcessManager()
 
-    def launch(self):
-        pass
-
     def restart(self):
         pass
 
@@ -55,12 +52,21 @@ class VirtualMachine(VirtualDevice):
         t = Thread(target=self._wait_agent)
         t.daemon = True
         t.start()
-        t.join(self.cfg.wait)
+        t.join(self.timeout_vm)
         if t.is_alive():
             self.debug("timeout waiting for agent")
             self.poweroff()
             return False
         return True
+
+    def _wait_agent(self):
+        while not self.ping_agent():
+            self.ping_agent()
+            sleep(1)
+
+    def ping_agent(self):
+        if self.connect():
+            return self.launch("echo \r\n\r\nHost Connected\r\n\r\n", 1)
 
     def poweroff(self):
         self.debug("powering off")
@@ -70,7 +76,7 @@ class VirtualMachine(VirtualDevice):
             self.error('poweroff error: %s' % cmd)
             rv = False
         sleep(1)
-        self.guest = None
+        self._guest = None
         return rv
 
     def restore(self, name=''):
@@ -137,7 +143,7 @@ class VirtualMachine(VirtualDevice):
         if self.proc.exec_quiet(cmd) != 0:
             self.error('start_sniff error: %s' % cmd)
             return False
-        self.sniff = True
+        self.wait_agent()
         return True
 
     def stop_sniff(self):
@@ -146,7 +152,7 @@ class VirtualMachine(VirtualDevice):
         if self.proc.exec_quiet(cmd) != 0:
             self.error('stop_sniff error: %s' % cmd)
             return False
-        self.sniff = False
+        self.wait_agent()
         return True
 
     def set_pcap(self, filepath):
@@ -164,21 +170,12 @@ class VirtualMachine(VirtualDevice):
 
     def connect(self):
         try:
-            self.guest = ServerProxy("http://%s:%s" % (self.addr, self.port), verbose=False)
+            self._guest = ServerProxy("http://%s:%s" % (self.addr, self.port), verbose=False)
         except Exception as e:
             self.error("connect error: %s" % e)
             return False
         else:
             return True
-
-    def _wait_agent(self):
-        while not self.ping_agent():
-            self.ping_agent()
-            sleep(1)
-
-    def ping_agent(self):
-        if self.connect():
-            return self.guest_cmd("echo \r\n\r\nHost Connected\r\n\r\n", 1)
 
     def release(self):
         """
@@ -189,15 +186,15 @@ class VirtualMachine(VirtualDevice):
         except (AttributeError, Full):
             sys.stderr.write("%s: unable to signal completion to VM manager. Messages queue not set\n" % self.name)
 
-    def guest_cmd(self, cmd, exec_time=30, verbose=False, working_dir=''):
+    def launch(self, cmd, exec_time=30, verbose=False, working_dir=''):
         self.debug("guest_cmd: %s\n" % cmd)
 
         rv = False
         rpc_num_try = 0
 
-        while not rv and rpc_num_try < self.rpc_max_try:
+        while not rv and rpc_num_try < self.rpc_attempts:
             try:
-                rv, out, err = self.guest.execute(cmd, exec_time, verbose, working_dir)
+                rv, out, err = self._guest.execute(cmd, exec_time, verbose, working_dir)
             except Exception as e:
                 if e.errno == 61:
                     """
@@ -216,24 +213,12 @@ class VirtualMachine(VirtualDevice):
                     rpc_num_try += 1
         return rv
 
-    def push(self, type_, user, src, dst):
-        if type_ == "winscp":
-            rv = self.winscp_push(user, src, dst)
-        elif type_ == "pscp":
-            rv = self.pscp_push(user, src, dst)
-        else:
-            sys.stderr.write("Unknown push method: %s\n" % type_)
-            rv = False
+    def push(self,user, src, dst):
+        rv = self.winscp_push(user, src, dst)
         return rv
     
-    def pull(self, type_, user, src, dst):
-        if type_ == "winscp":
-            rv = self.winscp_pull(user, src, dst)
-        elif type_ == "pscp":
-            rv = self.pscp_pull(user, src, dst)
-        else:
-            sys.stderr.write("Unknown pull method: %s\n" % type_)
-            rv = False
+    def pull(self, user, src, dst):
+        rv = self.winscp_pull(user, src, dst)
         return rv
 
     def winscp_push(self, user, src, dst):
@@ -246,7 +231,7 @@ class VirtualMachine(VirtualDevice):
                '"get %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
-        return self.guest_cmd(cmd)
+        return self.launch(cmd)
 
     def winscp_pull(self, user, src, dst):
         self.debug("winscp_pull: %s -> %s\n" % (src, dst))
@@ -258,35 +243,21 @@ class VirtualMachine(VirtualDevice):
                '"put -nopreservetime -transfer=binary %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
-        return self.guest_cmd(cmd)
-
-    def pscp_pull(self, user, src, dst):
-        if not self.guest:
-            return False
-        cmd = 'echo y | "%s" -r -i "%s" %s@%s:"%s" "%s"' % (PSCP, KEY, user, self.gateway, src, dst)
-        self.debug(cmd)
-        return self.guest.execute(cmd)
-
-    def pscp_push(self, user, src, dst):
-        if not self.guest:
-            return False
-        cmd = 'echo y | "%s" -i "%s" "%s" %s@%s:"%s"' % (PSCP, KEY, src, user, self.gateway, dst)
-        self.debug(cmd)
-        return self.guest.execute(cmd)
+        return self.launch(cmd)
 
     def terminate_pid(self, pid):
-        if not self.guest:
+        if not self._guest:
             return False
         cmd = 'taskkill /f /t /pid %s' % pid
         self.debug(cmd)
-        return self.guest.execute(cmd)
+        return self._guest.execute(cmd)
 
     def terminate_name(self, p_name):
-        if not self.guest:
+        if not self._guest:
             return False
         cmd = 'taskkill /f /t /IM %s' % p_name
         self.debug(cmd)
-        return self.guest.execute(cmd)
+        return self._guest.execute(cmd)
 
     def error(self, msg):
         logging.error('%s(%s:%s),%s: %s' % (self.name, self.addr, self.port, self.state_str, msg))

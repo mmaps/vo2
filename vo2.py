@@ -46,19 +46,16 @@ if __name__ == "__main__":
     job_cfg = load_config(cli_args.job_cfg)
     job_cfg.set("job", "debug", cli_args.debug)
 
-    cfg = Config()
-    cfg.add_settings(vo2_cfg)
-    cfg.add_settings(job_cfg)
+    config = Config()
+    config.add_settings(vo2_cfg)
+    config.add_settings(job_cfg)
 
-    job = Job(cfg)
+    job = Job(config)
     if not job.setup():
         log.error("Failed to create job. Exiting.")
         sys.exit(1)
 
-    vm_factory = Factory(vo2_cfg.find_all(VCFG_VM_KEY))
-    job_vms = job_cfg.get("job", "vms")
-    if job_vms:
-        vm_factory.use_vms(job_vms.split(","))
+    vm_factory = Factory(config)
 
     scheduler = Scheduler(job, vm_factory)
     scheduler.start()

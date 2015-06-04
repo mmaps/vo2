@@ -1,6 +1,7 @@
 import logging
 import multiprocessing as mp
 import Queue
+from cPickle import PicklingError
 
 import control
 
@@ -18,7 +19,7 @@ class Scheduler(object):
         self.task_queue = mp.Queue(MAXQUEUE)
 
     def init_controllers(self):
-        vms = self.vm_factory.list()
+        vms = self.vm_factory.list_vms()
         self.log.debug("Init controllers for: %s" % vms)
         for vm in vms:
             self.make_controller(vm)
@@ -37,7 +38,7 @@ class Scheduler(object):
         self.log.info("Starting controllers...")
         self.run_controllers()
         self.log.info("Starting scheduler...")
-        self.schedule_samples()
+        self.run()
         self.log.info("Cleaning up scheduler...")
         self.cleanup()
 
@@ -45,24 +46,27 @@ class Scheduler(object):
         for controller in self.task_controllers:
             controller.start()
 
-    def schedule_samples(self):
+    def run(self):
         while True:
-            sample = self.job.get_sample()
-            if not sample:
+            task = self.job.get_task()
+            if not task:
                 self.add_poison()
                 break
             else:
-                self.add_sample(sample)
+                self.add_task(task)
 
     def add_poison(self):
         for controller in range(len(self.task_controllers)):
-            self.add_sample(None)
+            self.add_task(None)
 
-    def add_sample(self, sample):
+    def add_task(self, task):
         try:
-            self.task_queue.put(sample, block=True, timeout=self.job.cfg.get_float("timeouts", "task_wait"))
+            self.task_queue.put(task, block=True, timeout=self.job.cfg.get_float("timeouts", "task_wait"))
         except Queue.Full:
             self.log.error("Timed out waiting for free task slot. VM's may be frozen")
+            self.kill_controllers(self.task_controllers)
+        except PicklingError:
+            self.log.error("Cannot pickle task object")
             self.kill_controllers(self.task_controllers)
 
     def cleanup(self):
