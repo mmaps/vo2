@@ -18,5 +18,3 @@
 #/Volumes/Macintosh_HD_2/voodo_src/mal_code/e-data-fails/11b1cd2bec0a02f78558d8248a97a9fd
 #/Volumes/Macintosh_HD_2/voodo_src/mal_code/e-data-fails/11c8af6b3de2b1b56272a36b118a1317
 #/Volumes/Macintosh_HD_2/voodo_src/mal_code/e-data-fails/12181311e049eb9f1b909eabfdb55427
-/Volumes/Macintosh_HD_2/voodo_src/mal_code/mbjacobs-artifacts/9cb3e96340dfe7da2056aafc5123f989
-/Volumes/Macintosh_HD_2/voodo_src/mal_code/mbjacobs-artifacts/9cb3e96340dfe7da2056aafc5123f989
