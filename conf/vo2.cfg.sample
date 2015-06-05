@@ -44,12 +44,12 @@ os = xpsp3
 address = 10.3.3.100
 port = 4828
 gateway = 10.3.3.1
-#[g_xp04]
-#type = vbox
-#os = xpsp3
-#address = 10.4.4.100
-#port = 4828
-#gateway = 10.4.4.1
+[g_xp04]
+type = vbox
+os = xpsp3
+address = 10.4.4.100
+port = 4828
+gateway = 10.4.4.1
 #[g_xp05]
 #type = vbox
 #os = xpsp3

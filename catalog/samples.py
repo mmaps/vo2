@@ -17,6 +17,25 @@ class SampleSet(object):
 
     def add_samples(self, samples):
         self.log.debug("Adding samples: %s" % samples)
+        rv = self.from_disk(samples)
+        if self.size <= 0:
+            raise ValueError
+        return rv
+
+    def add_blanks(self, blanks_count):
+        self.log.debug("Adding %s blanks" % blanks_count)
+        rv = True
+        try:
+            self.samples = set(["" for x in xrange(blanks_count)])
+        except TypeError:
+            self.log.error("Invalid sample count: %s == %s" % (blanks_count, type(blanks_count)))
+            rv = False
+        finally:
+            self.iterator = iter(self.samples)
+            self.size = len(self.samples)
+            return rv
+
+    def from_disk(self, samples):
         rv = True
         if os.path.isdir(samples):
             self.add_dir(samples)
@@ -48,16 +67,13 @@ class SampleSet(object):
         self.log.debug("Generating sample count")
         cnt = 0
         for sample in iter(self):
+            self.log.debug("Counting: %s" % sample)
             cnt += 1
-            sys.stdout.write("Sample %s, Count %d\r" % (sample, cnt))
         self.log.info("Sample set contains %d samples" % cnt)
         self.size = cnt
 
     def is_empty(self):
         return self.size == 0
-
-    def __iter__(self):
-        return self
 
     def next(self):
         if self.iterator is self:
@@ -70,10 +86,16 @@ class SampleSet(object):
                 sample = sample.rstrip()
             except AttributeError:
                 sample = sample.path
-            if not sample.startswith("#"):
-                break
+            if sample.startswith("#"):
+                continue
+            break
         return sample
 
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return len(self.samples)
 
 class Sample(object):
 

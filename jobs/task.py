@@ -60,11 +60,12 @@ class Task(object):
 
     def load_sample(self):
         if not self.sample or self.sample.filetype is files.ERR:
+            self.log("Invalid or missing sample")
             return False
         src = self.sample.path
-        dst = "%s\\%s" % (self.cfg.guestworkingdir, repr(self.sample))
+        dst = "%s\\%s" % (self.cfg.get("job", "guestworkingdir"), repr(self.sample))
         self.log("Task: Pushing sample\n\t\tTASK: src %s\n\t\tTASK: dst %s" % (src, dst))
-        return self.vm.push(self.cfg.user, src, dst)
+        return self.vm.push(self.cfg.get("job", "user"), src, dst, self.cfg.get("job", "guestworkingdir"))
 
     def log(self, msg):
         try:
@@ -76,6 +77,12 @@ class Task(object):
             sys.stderr.flush()
 
     def __str__(self):
-        return "Task:%s,%s" % (self.vm.name, self.sample.name)
+        string = "Task:"
+        try:
+            string += "%s,%s" % (self.vm.name, self.sample.name)
+        except AttributeError:
+            string += "None,None"
+        finally:
+            return string
 
 

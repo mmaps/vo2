@@ -1,19 +1,19 @@
 import ConfigParser
 import logging
 
+LOG = logging.getLogger('vo2.%s' % __name__)
 
 class Config(object):
     def __init__(self):
-        self.log = logging.getLogger('vo2.%s' % __name__)
         self.parsed_cfgs = []
         self.sections = {}
 
     def load(self, cfg_path):
-        self.log.debug("Loading %s" % cfg_path)
+        LOG.debug("Loading %s" % cfg_path)
         config = ConfigParser.SafeConfigParser(allow_no_value=True)
         self.parsed_cfgs.extend(self.parse(config, cfg_path))
         if not self.parsed_cfgs:
-            self.log.warn("Bad or empty config file: %s" % cfg_path)
+            LOG.warn("Bad or empty config file: %s" % cfg_path)
             return False
         return True
 
@@ -26,7 +26,7 @@ class Config(object):
         try:
             rv = parser.read(cfg_path)
         except ConfigParser.MissingSectionHeaderError as e:
-            self.log.error("Missing section headers in %s" % cfg_path)
+            LOG.error("Missing section headers in %s" % cfg_path)
         else:
             self.make_settings_dict(parser)
         finally:
@@ -35,13 +35,13 @@ class Config(object):
     def make_settings_dict(self, parser):
         for section in parser.sections():
             self.sections[section] = dict(parser.items(section))
-            self.log.debug("%s: %s" % (section, self.sections[section]))
+            LOG.debug("%s: %s" % (section, self.sections[section]))
 
     def get(self, section, key):
         try:
             value = self.sections[section].get(key)
-        except AttributeError:
-            self.log.debug("Unknown section: %s" % section)
+        except (AttributeError, KeyError):
+            LOG.debug("Unknown section: %s" % section)
             return None
         else:
             return value
@@ -59,24 +59,24 @@ class Config(object):
         try:
             value = float(value)
         except ValueError:
-            self.log.error("Could not coerce [%s]%s to float" % (section, key))
+            LOG.error("Could not coerce [%s]%s to float" % (section, key))
             return None
         else:
             return value
 
     def set(self, section, key, value):
-        self.log.debug("Setting [%s][%s]: %s" % (section, key, value))
+        LOG.debug("Setting [%s][%s]: %s" % (section, key, value))
         self.sections[section][key] = value
 
     def find_all(self, match):
-        self.log.debug("Searching config for: %s" % match)
+        LOG.debug("Searching config for: %s" % match)
         sections = {}
         for section, settings in self.sections.items():
-            self.log.debug("\tChecking: %s" % section)
+            LOG.debug("\tChecking: %s" % section)
             if section.startswith(match):
                 k = section.replace(match, '')
                 sections[k] = settings
-        self.log.debug("Found: %s" % sections.keys())
+        LOG.debug("Found: %s" % sections.keys())
         return sections
 
     def __str__(self):

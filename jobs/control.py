@@ -1,13 +1,13 @@
+import multiprocessing
 import os
 import sys
-import Queue
+from Queue import Empty
 from importlib import import_module
-from multiprocessing import Process
 
 from util import logs, files
 
 
-class TaskController(Process):
+class TaskController(multiprocessing.Process):
 
     def __init__(self, cfg, vm, work_queue):
         """
@@ -30,7 +30,7 @@ class TaskController(Process):
             try:
                 tsk = self.process_input(
                     self.work_queue.get(block=True, timeout=self.cfg.get_float("timeouts", "task_wait")))
-            except Queue.Empty:
+            except Empty:
                 self.log.error("%s timed out waiting for work input" % self)
                 self.stop = True
             else:
@@ -63,7 +63,10 @@ class TaskController(Process):
         return tsk.vm and tsk.logdir and tsk.logfile
 
     def get_task_log(self, tsk):
-        logdir = self.init_logdir(tsk.sample.logdir)
+        if tsk.sample:
+            logdir = self.init_logdir(tsk.sample.logdir)
+        else:
+            logdir = self.init_logdir(self.cfg.get("job", "name"))
         if not logdir:
             return False
         logfile = self.open_task_log(logdir, tsk.sample.name, self.vm.name)
@@ -72,6 +75,7 @@ class TaskController(Process):
         return logdir, logfile
 
     def init_logdir(self, sub_path):
+        self.log.debug("Init logdir: %s" % sub_path)
         root_path = self.cfg.get("general", "log_root")
         path = os.path.join(root_path, sub_path)
         if files.make_log_dir(path):
@@ -80,7 +84,10 @@ class TaskController(Process):
             return None
 
     def open_task_log(self, path, sample, vm):
-        logpath = os.path.join(path, "%s.%s.txt" % (sample, vm))
+        if sample:
+            logpath = os.path.join(path, "%s.%s.txt" % (sample, vm))
+        else:
+            logpath = os.path.join(path, "%s.%s.txt" % (self.cfg.get("job", "name"), vm))
         try:
             logfile = open(logpath, "w")
         except IOError as e:

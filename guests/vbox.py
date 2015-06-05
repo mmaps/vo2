@@ -1,11 +1,11 @@
 import sys
-import logging
 from time import sleep, time
 from xmlrpclib import ServerProxy
 from threading import Thread
 from Queue import Full
 
 from util.procs import ProcessManager
+from util import logs
 from virtdev import VirtualDevice
 
 
@@ -34,46 +34,60 @@ class VirtualMachine(VirtualDevice):
             self.debug("needs to be shut down")
             return False
 
-        cmd = [CMD, 'startvm', self.name, '--type', 'headless']
+        cmd = [CMD, "startvm", self.name]
+        if self.headless:
+            cmd.extend(["--type", "headless"])
         self.debug("starting: %s" % cmd)
         if self.proc.exec_quiet(cmd) != 0:
-            self.error('start failure: %s' % cmd)
+            self.debug('start failure: %s' % cmd)
             return False
         sleep(.5)
 
         if not self.wait_agent():
             return False
 
-        self.debug("agent online")
+        self.debug("Agent online")
         return True
 
     def wait_agent(self):
-        self.debug("waiting for agent to come online")
+        self.debug("Waiting for agent to come online")
         t = Thread(target=self._wait_agent)
         t.daemon = True
         t.start()
         t.join(self.timeout_vm)
         if t.is_alive():
-            self.debug("timeout waiting for agent")
+            self.debug("Timeout waiting for agent")
             self.poweroff()
             return False
         return True
 
     def _wait_agent(self):
         while not self.ping_agent():
+            print "PING"
+            self.debug("Ping %s" % self.name)
             self.ping_agent()
             sleep(1)
 
     def ping_agent(self):
         if self.connect():
-            return self.launch("echo \r\n\r\nHost Connected\r\n\r\n", 1)
+            return self.launch("echo Host Connected", 1, working_dir="C:\\malware")
+        return False
+
+    def connect(self):
+        try:
+            self._guest = ServerProxy("http://%s:%s" % (self.addr, self.port), verbose=False)
+        except Exception as e:
+            self.debug("connect error: %s" % e)
+            return False
+        else:
+            return True
 
     def poweroff(self):
         self.debug("powering off")
         rv = True
         cmd = [CMD, 'controlvm', self.name, 'poweroff']
         if self.proc.exec_quiet(cmd) != 0:
-            self.error('poweroff error: %s' % cmd)
+            self.debug('poweroff error: %s' % cmd)
             rv = False
         sleep(1)
         self._guest = None
@@ -99,13 +113,13 @@ class VirtualMachine(VirtualDevice):
             name = str(time())
         cmd = [CMD, 'snapshot', self.name, 'take', name]
         if self.proc.exec_quiet(cmd) != 0:
-            self.error('take_snap error: %s' % cmd)
+            self.debug('take_snap error: %s' % cmd)
             sys.exit(1)
 
     def del_snap(self, name):
         cmd = [CMD, 'snapshot', self.name, 'delete', name]
         if self.proc.exec_quiet(cmd) != 0:
-            self.error('del_snap error: %s' % cmd)
+            self.debug('del_snap error: %s' % cmd)
             sys.exit(1)
 
     def update_state(self):
@@ -141,7 +155,7 @@ class VirtualMachine(VirtualDevice):
         cmd = [CMD, 'controlvm', self.name, 'nictrace1', 'on']
         self.debug("start pcap: %s" % cmd)
         if self.proc.exec_quiet(cmd) != 0:
-            self.error('start_sniff error: %s' % cmd)
+            self.debug('start_sniff error: %s' % cmd)
             return False
         self.wait_agent()
         return True
@@ -150,7 +164,7 @@ class VirtualMachine(VirtualDevice):
         cmd = [CMD, 'controlvm', self.name, 'nictrace1', 'off']
         self.debug("stop pcap: %s" % cmd)
         if self.proc.exec_quiet(cmd) != 0:
-            self.error('stop_sniff error: %s' % cmd)
+            self.debug('stop_sniff error: %s' % cmd)
             return False
         self.wait_agent()
         return True
@@ -159,7 +173,7 @@ class VirtualMachine(VirtualDevice):
         cmd = [CMD, 'controlvm', self.name, 'nictracefile1', filepath]
         self.debug("set_pcap: %s" % cmd)
         if self.proc.exec_quiet(cmd) != 0:
-            self.error('set_pcap error: %s' % cmd)
+            self.debug('set_pcap error: %s' % cmd)
             return False
         return True
 
@@ -167,15 +181,6 @@ class VirtualMachine(VirtualDevice):
         self.poweroff()
         self.restore()
         self.start()
-
-    def connect(self):
-        try:
-            self._guest = ServerProxy("http://%s:%s" % (self.addr, self.port), verbose=False)
-        except Exception as e:
-            self.error("connect error: %s" % e)
-            return False
-        else:
-            return True
 
     def release(self):
         """
@@ -187,7 +192,7 @@ class VirtualMachine(VirtualDevice):
             sys.stderr.write("%s: unable to signal completion to VM manager. Messages queue not set\n" % self.name)
 
     def launch(self, cmd, exec_time=30, verbose=False, working_dir=''):
-        self.debug("guest_cmd: %s\n" % cmd)
+        self.debug("guest_cmd: %s, time=%s, verbose=%s, dir=%s\n" % (cmd, exec_time, verbose, working_dir))
 
         rv = False
         rpc_num_try = 0
@@ -196,13 +201,13 @@ class VirtualMachine(VirtualDevice):
             try:
                 rv, out, err = self._guest.execute(cmd, exec_time, verbose, working_dir)
             except Exception as e:
+                """
                 if e.errno == 61:
-                    """
                     Connection Refused, this is expected if the guest is loading
-                    """
                     pass
-                else: 
-                    self.error("Error executing RPC on %s\n\t%s\n\t%s" % (self, cmd, e))
+                else:
+                """
+                self.debug("Launch error: %s\n%s" % (cmd, e))
             else:
                 if out:
                     self.debug(out)
@@ -213,15 +218,15 @@ class VirtualMachine(VirtualDevice):
                     rpc_num_try += 1
         return rv
 
-    def push(self,user, src, dst):
-        rv = self.winscp_push(user, src, dst)
+    def push(self,user, src, dst, dir_):
+        rv = self.winscp_push(user, src, dst, dir_)
         return rv
     
-    def pull(self, user, src, dst):
-        rv = self.winscp_pull(user, src, dst)
+    def pull(self, user, src, dst, dir_):
+        rv = self.winscp_pull(user, src, dst, dir_)
         return rv
 
-    def winscp_push(self, user, src, dst):
+    def winscp_push(self, user, src, dst, dir_):
         self.debug("winscp_push: %s -> %s\n" % (src, dst))
         cmd = [EXEDIR + '\\winscp.exe',
                '/console', '/command',
@@ -231,9 +236,9 @@ class VirtualMachine(VirtualDevice):
                '"get %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
-        return self.launch(cmd)
+        return self.launch(cmd, working_dir=dir_)
 
-    def winscp_pull(self, user, src, dst):
+    def winscp_pull(self, user, src, dst, dir_):
         self.debug("winscp_pull: %s -> %s\n" % (src, dst))
         cmd = [EXEDIR + '\\winscp.exe',
                '/console', '/command',
@@ -243,7 +248,7 @@ class VirtualMachine(VirtualDevice):
                '"put -nopreservetime -transfer=binary %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
-        return self.launch(cmd)
+        return self.launch(cmd, working_dir=dir_)
 
     def terminate_pid(self, pid):
         if not self._guest:
@@ -260,9 +265,8 @@ class VirtualMachine(VirtualDevice):
         return self._guest.execute(cmd)
 
     def error(self, msg):
-        logging.error('%s(%s:%s),%s: %s' % (self.name, self.addr, self.port, self.state_str, msg))
+        sys.stderr.write('%s(%s:%s),%s: %s\n' % (self.name, self.addr, self.port, self.state_str, msg))
 
     def debug(self, msg):
-        logging.debug('%s(%s:%s),%s: %s' % (self.name, self.addr, self.port, self.state_str, msg))
-
+        sys.stderr.write('%s(%s:%s),%s: %s\n' % (self.name, self.addr, self.port, self.state_str, msg))
 

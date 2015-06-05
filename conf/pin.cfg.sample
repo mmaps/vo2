@@ -4,10 +4,11 @@ name = pin-sample
 tool = tools.pin
 
 #vms = xp00,xp01,xp02,xp03,xp04,xp05,xp06,xp07,xp08,xp09
-vms = xp03
+vms = xp04
 
 #input = /Volumes/Macintosh_HD_2/voodo_src/mal_code/e_data
-input = testfiles.txt
+input = /Volumes/Macintosh_HD_2/vo2-test
+#input = testfiles.txt
 
 guestworkingdir = c:\\malware\\
 

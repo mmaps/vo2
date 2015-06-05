@@ -24,6 +24,8 @@ class VirtualDevice(object):
         self.rpc_attempts = 2
         self.timeout_vm = 30
         self.timeout_job = 180
+        self.headless = False
+        self.log = None
 
     @abc.abstractmethod
     def start(self):

@@ -26,18 +26,25 @@ class Job(object):
         rv = False
         try:
             rv = self.sample_set.add_samples(sample_input)
+        except ValueError:
+            self.log.error("Empty sample input")
+            rv = False
         except TypeError:
-            self.log.error("No samples specified: %s" % sample_input)
-            self.sample_set = xrange(len(self.cfg.get("job", "vms")))
-            rv = True
+            vm_count = len(self.cfg.get("job", "vms").split(","))
+            self.log.debug("No samples specified. Assigning 1 job to each VM: %s" % vm_count)
+            rv = self.sample_set.add_blanks(vm_count)
         finally:
             return rv
 
     def get_task(self):
+        self.log.debug("Get task")
         sample = self.get_sample()
+        if not sample:
+            return None
         return task.Task(self.cfg, sample)
 
     def get_sample(self):
+        self.log.debug("Getting sample")
         try:
             sample = self.iterator.next()
         except StopIteration:
@@ -46,10 +53,11 @@ class Job(object):
             spath = files.resolve_path(sample)
             sname = files.filename(spath)
             sample = samples.Sample(sname, spath)
+        self.log.debug("Sample returned")
         return sample
 
     def size(self):
-        return self.sample_set.size
+        return len(self.sample_set)
 
     def __iter__(self):
         return iter(self.sample_set)

@@ -48,6 +48,8 @@ def get_filetype(path):
 
 
 def resolve_path(full_path):
+    if not full_path:
+        return ''
     path = os.path.expanduser(full_path)
     path = os.path.expandvars(path)
     path = os.path.abspath(path)
@@ -55,6 +57,8 @@ def resolve_path(full_path):
 
 
 def filename(path):
+    if not path:
+        return ''
     return os.path.basename(path)
 
 
