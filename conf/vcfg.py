@@ -51,7 +51,7 @@ class Config(object):
 
     def get_bool(self, section, key):
         value = self.get(section, key)
-        return value is not None and (value is 1 or value.lower() == "yes"
+        return value is not None and (value == "1" or value.lower() == "yes"
                                       or value.lower() == "true" or value.lower() == "on")
 
     def get_float(self, section, key):
