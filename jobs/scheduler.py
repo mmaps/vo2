@@ -28,7 +28,7 @@ class Scheduler(object):
 
         def sigint_handler(signal_, frame):
             signal.signal(signal.SIGINT, signal.SIG_IGN)
-            sys.stdout.write("Signal caught in PID: %s...\nCurrent progress: %d / %d\n" % (os.getpid(), self.task_cnt, self.task_max))
+            sys.stdout.write("Signal caught in PID: %s...\nWaiting tasks enqueued: %d / %d\n" % (os.getpid(), self.task_cnt, self.task_max))
             proceed = ""
             while proceed != "y" and proceed != "n":
                 proceed = raw_input("Continue? y/n\n").lower()

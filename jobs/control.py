@@ -2,7 +2,7 @@ import multiprocessing
 import os
 import signal
 import sys
-import time
+import threading
 from Queue import Empty
 from importlib import import_module
 
@@ -140,6 +140,14 @@ class TaskController(multiprocessing.Process):
         return logfile
 
     def run_task(self, tsk):
+        timeout = self.cfg.get("timeouts", "task_wait")
+        watchdog = threading.Thread(target=self._run_task, args=(tsk,))
+        watchdog.start()
+        watchdog.join(timeout=timeout)
+        if watchdog.is_alive():
+            self.log.error("%s timed out waiting on tool to run for %s" % (self, timeout))
+
+    def _run_task(self, tsk):
         self.tool.run(tsk)
 
     def cleanup_task(self, tsk):
