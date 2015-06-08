@@ -59,6 +59,14 @@ class Task(object):
         if not self.vm.wait_agent():
             self.log("task - Error waiting for agent response")
 
+    def load(self, src, dst):
+        if not os.path.isfile(src) and not os.path.isdir(src):
+            self.log("Can't load invalid source: %s" % src)
+            return False
+        dst = "%s\\%s" % (self.cfg.get("job", "guestworkingdir"), dst)
+        self.log("task -  Pushing sample\n\t\tTASK: src %s\n\t\tTASK: dst %s" % (src, dst))
+        return self.vm.push(self.cfg.get("job", "user"), src, dst, self.cfg.get("job", "guestworkingdir"))
+
     def load_sample(self):
         if not self.sample or self.sample.filetype is files.ERR:
             self.log("task - Invalid or missing sample")
