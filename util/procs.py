@@ -10,7 +10,7 @@ from threading import Thread
 class ProcessManager(object):
     
     def __init__(self):
-        #self.devnull = open(os.devnull, 'w')
+        self.devnull = open(os.devnull, 'w')
         self.procs = {}
 
     def exec_quiet(self, cmd, timeout=60):
@@ -19,7 +19,7 @@ class ProcessManager(object):
         if isinstance(cmd, list):
             use_shell = False
         try:
-            proc = Popen(cmd, shell=use_shell)
+            proc = Popen(cmd, shell=use_shell, stdout=self.devnull, stderr=self.devnull)
         except OSError as e:
             log.error('exec_null error: %s\n\tcmd: %s' % (e, cmd))
             return 1
@@ -94,10 +94,12 @@ class ProcessManager(object):
             rc, out, err = results.get()
         return rc, out, err
 
-    def _communicate(self, proc, result_qu):
+    @staticmethod
+    def _communicate(proc, result_qu):
         out, err = proc.communicate()
         result_qu.put((proc.poll(), out, err))
 
-    def _join(self, proc, result_qu):
+    @staticmethod
+    def _join(proc, result_qu):
         proc.wait()
         result_qu.put((proc.poll(), '', ''))
