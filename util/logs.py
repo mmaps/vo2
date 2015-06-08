@@ -12,6 +12,7 @@ def init_logging(name, debug=False):
     else:
         log.setLevel(logging.WARN)
     log.addHandler(console_hdlr)
+    log.propagate = False
     log.debug("Debugging on")
     return log
 

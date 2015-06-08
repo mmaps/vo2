@@ -2,9 +2,12 @@ import os
 import Queue
 import signal
 import sys
-import logging as log
 from subprocess import Popen, PIPE
 from threading import Thread
+
+
+PROCERR = 1
+PROCWARN = -1
 
 
 class ProcessManager(object):
@@ -12,25 +15,32 @@ class ProcessManager(object):
     def __init__(self):
         self.devnull = open(os.devnull, 'w')
         self.procs = {}
+        self.log = None
+
+    def log(self, msg):
+        try:
+            self.log(msg)
+        except TypeError:
+            sys.stderr.write("ProcessManager log function not set: %s" % msg)
 
     def exec_quiet(self, cmd, timeout=60):
-        log.debug("exec_quiet: %s" % cmd)
+        self.log("exec_quiet: %s" % cmd)
         use_shell = True
         if isinstance(cmd, list):
             use_shell = False
         try:
             proc = Popen(cmd, shell=use_shell, stdout=self.devnull, stderr=self.devnull)
         except OSError as e:
-            log.error('exec_null error: %s\n\tcmd: %s' % (e, cmd))
-            return 1
+            self.log('exec_null error: %s\n\tcmd: %s' % (e, cmd))
+            return PROCERR
         else:
             rc, out, err = self.cleanup_proc(proc, timeout)
             if err:
-                log.error("exec_quiet error: %s = %s" % (cmd, err))
+                self.log("exec_quiet error: %s = %s" % (cmd, err))
             return rc
 
     def execute(self, cmd, verbose=False, fatal=False):
-        log.debug("execute: %s, %s, %s" % (cmd, verbose, fatal))
+        self.log("execute: %s, %s, %s" % (cmd, verbose, fatal))
         cmd_str = cmd
         use_shell = True
         if isinstance(cmd, list):
@@ -41,11 +51,11 @@ class ProcessManager(object):
         try:
             proc = Popen(cmd, preexec_fn=os.setsid, shell=use_shell, stdout=PIPE, stderr=PIPE)
         except OSError as err:
-            log.error("execute error: %s = %s" % (cmd_str, err))
+            self.log("execute error: %s = %s" % (cmd_str, err))
             if not fatal:
-                return -1
+                return PROCWARN
             else:
-                sys.exit(1)
+                sys.exit(PROCERR)
         else:
             self.procs[proc.pid] = proc
             return proc.pid
@@ -54,7 +64,7 @@ class ProcessManager(object):
         try:
             proc = self.procs.pop(pid)
         except KeyError:
-            log.error("process mgr: get_output on unknown PID: %s" % pid)
+            self.log("process mgr: get_output on unknown PID: %s" % pid)
             out = ''
             err = 'UNKNOWN PID: %s' % pid
         else:
@@ -66,7 +76,7 @@ class ProcessManager(object):
         try:
             proc = self.procs.pop(pid)
         except KeyError:
-            log.error("process mgr: end_process on unknown PID: %s" % pid)
+            self.log("process mgr: end_process on unknown PID: %s" % pid)
             rv = 'UNKNOWN PID: %s' % pid
         else:
             os.killpg(pid, signal.SIGTERM)
@@ -86,8 +96,8 @@ class ProcessManager(object):
         t.start()
         t.join(timeout)
         if t.is_alive():
-            log.error("cleanup proc timeout on %s" % proc.pid)
-            rc = 1
+            self.log("cleanup proc timeout on %s" % proc.pid)
+            rc = PROCERR
             out = ''
             err = self.end_proc(proc.pid)
         else:

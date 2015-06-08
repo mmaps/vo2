@@ -5,7 +5,6 @@ from threading import Thread
 from Queue import Full
 
 from util.procs import ProcessManager
-from util import logs
 from virtdev import VirtualDevice
 
 
@@ -20,9 +19,6 @@ WINSCP = r'c:\remote\bin\winscp.exe'
 class VirtualMachine(VirtualDevice):
 
     proc = ProcessManager()
-
-    def restart(self):
-        pass
 
     def start(self):
         self.debug("Start %s [%s:%s]" % (self.name, self.addr, self.port))
@@ -264,9 +260,19 @@ class VirtualMachine(VirtualDevice):
         self.debug(cmd)
         return self._guest.execute(cmd)
 
+    def set_log(self, log):
+        self.log = log
+        self.proc.log = log
+
     def error(self, msg):
-        sys.stderr.write('%s(%s:%s),%s: %s\n' % (self.name, self.addr, self.port, self.state_str, msg))
+        try:
+            self.log('vm - error - %s(%s:%s): %s' % (self.name, self.addr, self.port, msg))
+        except TypeError:
+            sys.stderr.write('vm - error - %s(%s:%s): %s' % (self.name, self.addr, self.port, msg))
 
     def debug(self, msg):
-        sys.stderr.write('%s(%s:%s),%s: %s\n' % (self.name, self.addr, self.port, self.state_str, msg))
+        try:
+            self.log('vm - debug - %s(%s:%s): %s' % (self.name, self.addr, self.port, msg))
+        except TypeError:
+            sys.stderr.write('vm - debug - %s(%s:%s): %s' % (self.name, self.addr, self.port, msg))
 

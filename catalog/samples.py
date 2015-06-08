@@ -95,7 +95,7 @@ class SampleSet(object):
         return self
 
     def __len__(self):
-        return len(self.samples)
+        return self.size
 
 class Sample(object):
 

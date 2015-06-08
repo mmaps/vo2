@@ -1,6 +1,8 @@
 import multiprocessing
 import os
+import signal
 import sys
+import time
 from Queue import Empty
 from importlib import import_module
 
@@ -23,8 +25,40 @@ class TaskController(multiprocessing.Process):
         self.stop = False
         self.log = logs.init_logging("%s" % self, self.cfg.get("general", "debug"))
 
+    def init_sig_handler(self, sig, lock):
+        self.log.info("Installing SIGINT handler in TaskController")
+
+        def sigint_handler(signal_, frame):
+            if not lock.acquire(False):
+                """
+                Already interrupted
+                """
+                self.log.debug("Resuming")
+                lock.release()
+            else:
+                """
+                Not interrupted
+                """
+                self.log.debug("Paused by SIGTERM")
+                signal.pause()
+
+        def sigterm_handler(signal_, frame):
+            self.log.debug("Exiting...")
+            sys.exit(1)
+
+        if sig == signal.SIGINT:
+            sig_handler = sigint_handler
+        elif sig == signal.SIGTERM:
+            sig_handler = sigterm_handler
+        else:
+            sig_handler = None
+
+        return sig_handler
+
     def run(self):
-        self.log.info("%s task controller running" % self)
+        self.log.info("%s - %s task controller running" % (self, self.pid))
+        signal.signal(signal.SIGINT, self.init_sig_handler(signal.SIGINT, multiprocessing.Lock()))
+        signal.signal(signal.SIGTERM, self.init_sig_handler(signal.SIGTERM, multiprocessing.Lock()))
         self.import_tool(self.cfg.get("job", "tool"))
         while not self.stop:
             try:
@@ -52,15 +86,25 @@ class TaskController(multiprocessing.Process):
 
     def handle_task(self, tsk):
         self.log.debug("Handling: %s" % tsk)
-        if self.setup_task(tsk):
+        logdir, logfile = self.get_task_log(tsk)
+        if self.setup_task(tsk, logdir, logfile) and self.setup_vm(tsk):
             self.run_task(tsk)
         self.cleanup_task(tsk)
+        self.cleanup_vm()
 
-    def setup_task(self, tsk):
+    def setup_task(self, tsk, logdir, logfile):
         tsk.set_vm(self.vm)
-        logdir, logfile = self.get_task_log(tsk)
         tsk.set_log(logdir, logfile)
         return tsk.vm and tsk.logdir and tsk.logfile
+
+    def setup_vm(self, tsk):
+        try:
+            self.vm.set_log(tsk.log)
+        except AttributeError as e:
+            sys.stderr.write("Error setting up VM: %s\n" % e)
+            return False
+        else:
+            return True
 
     def get_task_log(self, tsk):
         if tsk.sample:
@@ -100,7 +144,11 @@ class TaskController(multiprocessing.Process):
 
     def cleanup_task(self, tsk):
         self.log.debug("Cleaning up task: %s" % tsk)
+        tsk.logfile.flush()
         tsk.logfile.close()
+
+    def cleanup_vm(self):
+        self.vm.set_log(None)
 
     def cleanup(self):
         self.log.info("%s cleaning up" % self)

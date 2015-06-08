@@ -36,10 +36,6 @@ class VirtualDevice(object):
         pass
 
     @abc.abstractmethod
-    def restart(self):
-        pass
-
-    @abc.abstractmethod
     def restore(self):
         pass
 
@@ -60,15 +56,19 @@ class VirtualDevice(object):
         pass
 
     @abc.abstractmethod
-    def push(self, user, src, dst):
+    def push(self, user, src, dst, work_dir):
         pass
 
     @abc.abstractmethod
-    def pull(self, user, src, dst):
+    def pull(self, user, src, dst, work_dir):
         pass
 
     @abc.abstractmethod
     def launch(self, cmd, exec_time=30, verbose=False, working_dir=''):
+        pass
+
+    @abc.abstractmethod
+    def set_log(self, log):
         pass
 
     def get_state(self):

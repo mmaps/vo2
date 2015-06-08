@@ -1,9 +1,11 @@
 import logging
 import multiprocessing as mp
+import os
+import signal
+import sys
 import traceback
 import Queue
-from cPickle import PicklingError
-import time
+
 import control
 
 
@@ -16,8 +18,32 @@ class Scheduler(object):
         self.log = logging.getLogger("vo2.%s" % __name__)
         self.job = job
         self.vm_factory = vm_fact
+        self.task_cnt = 0
+        self.task_max = 0
         self.task_controllers = []
         self.task_queue = mp.Queue(MAXQUEUE)
+
+    def init_sig_handler(self, sig):
+        self.log.info("Installing SIGINT handler")
+
+        def sigint_handler(signal_, frame):
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+            sys.stdout.write("Signal caught in PID: %s...\nCurrent progress: %d / %d\n" % (os.getpid(), self.task_cnt, self.task_max))
+            proceed = ""
+            while proceed != "y" and proceed != "n":
+                proceed = raw_input("Continue? y/n\n").lower()
+            if proceed == "y":
+                self.kill_controllers(signal.SIGINT, self.task_controllers)
+            elif proceed == "n":
+                self.kill_controllers(signal.SIGTERM, self.task_controllers)
+            signal.signal(signal.SIGINT, sigint_handler)
+
+        if sig == signal.SIGINT:
+            sig_handler = sigint_handler
+        else:
+            sig_handler = None
+
+        return sig_handler
 
     def init_controllers(self):
         vms = self.vm_factory.list_vms()
@@ -39,6 +65,7 @@ class Scheduler(object):
         self.log.info("Starting controllers...")
         self.run_controllers()
         self.log.info("Starting scheduler...")
+        signal.signal(signal.SIGINT, self.init_sig_handler(signal.SIGINT))
         try:
             self.run()
         except AssertionError:
@@ -54,15 +81,19 @@ class Scheduler(object):
 
     def run(self):
         assert(len(self.task_controllers) > 0)
-        while True:
+        self.task_cnt = 0
+        self.task_max = self.job.size()
+        self.log.debug("tasks %d / %d" % (self.task_cnt, self.task_max))
+        while self.task_cnt < self.task_max:
             task = self.job.get_task()
             if not task:
-                self.log.debug("Tasks empty")
-                self.add_poison()
+                self.log.debug("got empty task: %s" % task)
                 break
             else:
-                self.log.debug("Got task: %s" % task)
+                self.task_cnt += 1
+                self.log.debug("got task: %s" % task)
                 self.add_task(task)
+        self.add_poison()
 
     def add_poison(self):
         for controller in range(len(self.task_controllers)):
@@ -72,9 +103,6 @@ class Scheduler(object):
         self.log.debug("Adding task: %s" % task)
         try:
             self.task_queue.put(task, block=True, timeout=self.job.cfg.get_float("timeouts", "task_wait"))
-        except PicklingError:
-            self.log.error("Task object cannot be added to work queue. Cannot be pickled")
-            self.kill_controllers(self.task_controllers)
         except Queue.Full:
             self.log.error("Timed out waiting for free task slot. VM's may be frozen")
             self.kill_controllers(self.task_controllers)
@@ -94,8 +122,12 @@ class Scheduler(object):
         if not qu.empty():
             qu.cancel_join_thread()
 
-    def kill_controllers(self, controllers):
-        self.log.debug("Terminating controller processes forcefully...")
+    def kill_controllers(self, sig, controllers):
+        self.log.debug("Signaling kill to controllers")
         for controller in controllers:
-            controller.terminate()
-
+            if sig is signal.SIGINT:
+                self.log.debug("Sending SIGINT to %s" % controller)
+                os.kill(controller.pid, signal.SIGINT)
+            else:
+                self.log.debug("Sending SIGTERM to %s" % controller)
+                controller.terminate()
