@@ -70,7 +70,7 @@ class Scheduler(object):
             self.run()
         except AssertionError:
             self.log.error("Error running scheduler: %s" % traceback.format_exc())
-            self.kill_controllers(self.task_controllers)
+            self.kill_controllers(signal.SIGTERM, self.task_controllers)
         finally:
             self.log.info("Cleaning up scheduler...")
             self.cleanup()
@@ -105,7 +105,7 @@ class Scheduler(object):
             self.task_queue.put(task, block=True, timeout=self.job.cfg.get_float("timeouts", "task_wait"))
         except Queue.Full:
             self.log.error("Timed out waiting for free task slot. VM's may be frozen")
-            self.kill_controllers(self.task_controllers)
+            self.kill_controllers(signal.SIGTERM, self.task_controllers)
 
     def cleanup(self):
         self.log.debug("Beginning scheduler cleanup...")

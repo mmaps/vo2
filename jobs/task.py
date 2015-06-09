@@ -20,6 +20,10 @@ class Task(object):
         self.vm = vm
 
     def set_log(self, logdir, logfile):
+        try:
+            sys.stderr.write("Logging %s to: %s\n" % (self, os.path.join(logdir, logfile.name)))
+        except AttributeError as e:
+            sys.stderr.write("Logfile is not a file?\n%s\n" % e)
         self.logdir = logdir
         self.logfile = logfile
         self.vm.log = logfile
@@ -78,6 +82,7 @@ class Task(object):
 
     def log(self, msg):
         try:
+            print msg
             self.logfile.write("%s: %s\n" % (strftime("%H:%M:%S", localtime()), msg))
         except IOError as err:
             sys.stderr.write("Logging error: %s\n" % err)

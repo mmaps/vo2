@@ -140,6 +140,7 @@ class TaskController(multiprocessing.Process):
         return logfile
 
     def run_task(self, tsk):
+        self.log.debug("Running task %s" % tsk)
         timeout = self.cfg.get_float("timeouts", "task_wait")
         watchdog = threading.Thread(target=self._run_task, args=(tsk,))
         watchdog.start()
