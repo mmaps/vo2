@@ -66,7 +66,7 @@ class VServer(object):
         log.debug("Gathering results")
         try:
             rv, stdout, stderr = self.results.get(True, 3)
-            log.debug("[RV:\n%s\nSOut:\n%s\nSErr:\n%s]" % rv, stdout, stderr)
+            log.debug("[RV:\n%s\nSOut:\n%s\nSErr:\n%s]" % (rv, stdout, stderr))
         except Empty:
             log.debug("[Empty Results]")
 
