@@ -59,23 +59,27 @@ class VirtualMachine(VirtualDevice):
 
     def _wait_agent(self):
         while not self.ping_agent():
-            print "PING"
             self.debug("Ping %s" % self.name)
             self.ping_agent()
             sleep(1)
 
     def ping_agent(self):
         if self.connect():
+            self.debug("pinged agent")
             return self.launch("echo Host Connected", 1, working_dir="C:\\malware")
+        else:
+            self.debug("agent did not respond")
         return False
 
-    def connect(self, addr, port):
+    def connect(self, addr=None, port=None):
         if not addr:
             addr = self.addr
         if not port:
             port = self.port
         try:
-            self._guest = ServerProxy("http://%s:%s" % (addr, port), verbose=False)
+            http_addr = "http://%s:%s" % (addr, port)
+            self.debug("Connecting to %s" % http_addr)
+            self._guest = ServerProxy(http_addr, verbose=False)
         except Exception as e:
             self.debug("connect error: %s" % e)
             return False
@@ -234,12 +238,12 @@ class VirtualMachine(VirtualDevice):
         cmd = [EXEDIR + '\\winscp.exe',
                '/console', '/command',
                '"option confirm off"',
-               '"option batch abort"',
+               #'"option batch abort"',
                '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.gateway, KEY),
                '"get %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
-        return self.launch(cmd, working_dir=dir_)
+        return self.launch(cmd, exec_time=300, working_dir=dir_)
 
     def winscp_pull(self, user, src, dst, dir_):
         self.debug("winscp_pull: %s -> %s\n" % (src, dst))
@@ -251,7 +255,7 @@ class VirtualMachine(VirtualDevice):
                '"put -nopreservetime -transfer=binary %s %s"' % (src, dst),
                '"exit"']
         cmd = ' '.join(cmd)
-        return self.launch(cmd, working_dir=dir_)
+        return self.launch(cmd, exec_time=300, working_dir=dir_)
 
     def terminate_pid(self, pid):
         if not self._guest:
