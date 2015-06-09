@@ -15,7 +15,7 @@ class VirtualDevice(object):
         self.msgs = None
         self._guest = None
         self.state = -1
-        self.state_str = ''
+        self.state_str = 'Unknown'
         self.busy = False
         self.name = name
         self.addr = ''
