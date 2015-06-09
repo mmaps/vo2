@@ -69,9 +69,13 @@ class VirtualMachine(VirtualDevice):
             return self.launch("echo Host Connected", 1, working_dir="C:\\malware")
         return False
 
-    def connect(self):
+    def connect(self, addr, port):
+        if not addr:
+            addr = self.addr
+        if not port:
+            port = self.port
         try:
-            self._guest = ServerProxy("http://%s:%s" % (self.addr, self.port), verbose=False)
+            self._guest = ServerProxy("http://%s:%s" % (addr, port), verbose=False)
         except Exception as e:
             self.debug("connect error: %s" % e)
             return False
@@ -110,13 +114,13 @@ class VirtualMachine(VirtualDevice):
         cmd = [CMD, 'snapshot', self.name, 'take', name]
         if self.proc.exec_quiet(cmd) != 0:
             self.debug('take_snap error: %s' % cmd)
-            sys.exit(1)
+            return False
 
     def del_snap(self, name):
         cmd = [CMD, 'snapshot', self.name, 'delete', name]
         if self.proc.exec_quiet(cmd) != 0:
             self.debug('del_snap error: %s' % cmd)
-            sys.exit(1)
+            return False
 
     def update_state(self):
         cmd = [CMD, 'showvminfo', self.name, '--machinereadable']
@@ -196,6 +200,9 @@ class VirtualMachine(VirtualDevice):
         while not rv and rpc_num_try < self.rpc_attempts:
             try:
                 rv, out, err = self._guest.execute(cmd, exec_time, verbose, working_dir)
+            except TypeError:
+                self.error("Launch error, guest object does not exist")
+                return False
             except Exception as e:
                 """
                 if e.errno == 61:
