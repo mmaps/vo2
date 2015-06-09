@@ -40,7 +40,7 @@ class Factory(object):
     def configure_guest(self, guest):
         section = "%s%s" % (self.cfg.get("general", "guest_name_prefix"), guest.name)
         guest.addr = self.cfg.get(section, "address")
-        guest.port = self.cfg.get(section, "port")
+        guest.port = int(self.cfg.get(section, "port"))
         guest.gateway = self.cfg.get(section, "gateway")
         guest.headless = self.cfg.get_bool(section, "headless")
         self.log.debug("Configuring guest %s: %s,%s,%s" % (section, guest.addr, guest.port, guest.gateway))
