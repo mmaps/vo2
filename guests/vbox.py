@@ -32,7 +32,11 @@ class VirtualMachine(VirtualDevice):
 
         cmd = [CMD, "startvm", self.name]
         if self.headless:
+            if not self.is_off():
+                self.error("vm is not powered off. Headless VMs must be saved in an off state")
+                return False
             cmd.extend(["--type", "headless"])
+
         self.debug("starting: %s" % cmd)
         if self.proc.exec_quiet(cmd) != 0:
             self.debug('start failure: %s' % cmd)
