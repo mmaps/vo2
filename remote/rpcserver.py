@@ -1,19 +1,31 @@
 import sys
 import logging
+import traceback
 from importlib import import_module
+from SocketServer import ThreadingMixIn
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 
 VERSION = 0.0
+
+
+class ThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):
+    pass
 
 
 def get_backend(backend_type):
     logging.info('get_backend type %s' % backend_type)
     backend = None
     module, _, class_ = backend_type.rpartition('.')
+    print "Importing Module: %s\nClass: %s" % (module, class_)
     try:
         backing_module = import_module(module)
     except ImportError as e:
+        print e
         logging.warn(e)
+    except Exception as e:
+        print e
+        print traceback.format_exc()
+        raw_input("Waiting")
     else:
         try:
             backend = getattr(backing_module, class_)
@@ -27,7 +39,7 @@ def get_backend(backend_type):
 def main(addr, port, type_):
     logging.warn('Main, Version: %d' % VERSION)
     logging.info('main creating server on %s:%d' % (addr, port))
-    server = SimpleXMLRPCServer((addr, port), allow_none=True)
+    server = ThreadedXMLRPCServer((addr, port), allow_none=True)
     backend_type = get_backend(type_)
     if backend_type:
         logging.info('main registering and server')
