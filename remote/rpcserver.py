@@ -61,7 +61,7 @@ if __name__ == '__main__':
         logging.info('No or invalid arguments found. Defaulting to defaults')
         addr = intern('0.0.0.0')
         port = 4828
-        type_ = intern('servers.vserver.EvalServer')
+        type_ = intern('vserver.EvalServer')
     except ValueError:
         sys.stderr.write("Invalid port number string: %s\n" % sys.argv[2])
         sys.exit(0)

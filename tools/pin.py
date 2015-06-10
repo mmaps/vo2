@@ -1,10 +1,10 @@
 import os
-import threading
-import time
+import xmlrpclib
 from util import files
 
 
 def remote_run(tsk, cmd, execution_time, verbose, working_dir, retval):
+    print "Remote Run: %s" % cmd
     tsk.log("remote run: %s" % cmd)
     retval = tsk.vm.launch(cmd, exec_time=execution_time, verbose=verbose, working_dir=working_dir)
 
@@ -14,6 +14,9 @@ def analyze(tsk, pincmd, bincmd, execution_time, suffix='pe32'):
 
     :type tsk: jobs.task.Task
     """
+    guest_dir = tsk.cfg.get("job", "guestworkingdir")
+    interactive = tsk.cfg.get_bool("job", "interactive")
+
     if not tsk.setup_vm():
         tsk.log("VM setup failed")
         return False
@@ -26,56 +29,35 @@ def analyze(tsk, pincmd, bincmd, execution_time, suffix='pe32'):
         tsk.log("Starting PCAP for %s" % suffix)
         tsk.start_pcap(name_suffix=".%s" % suffix)
 
-    interactive = False
-    if tsk.cfg.get_bool("job", "interactive"):
+    if interactive:
         tsk.log("Running in interactive mode")
         tsk.load(os.path.join(os.getcwd(), "remote/bin/clicks.exe"), "clicks.exe")
         tsk.load(os.path.join(os.getcwd(), "remote/bin/clicker.exe"), "clicker.exe")
-        interactive = True
+        tsk.log("Starting clicker")
+        cmd = guest_dir + "\\clicker.exe"
+        tsk.vm._guest.exec_service(cmd, guest_dir)
     else:
         tsk.log("NON-interactive mode")
 
-    guest_dir = tsk.cfg.get("job", "guestworkingdir")
+    multicall = xmlrpclib.MultiCall(tsk.vm._guest)
 
     bincmd += '"%s"' % tsk.sample.name
     cmd = ' -- '.join([pincmd, bincmd])
     tsk.log("CMD: %s" % cmd)
-
-    analysis_rv = True
-    analysis_thread = threading.Thread(target=remote_run, args=(tsk, cmd, execution_time, True,
-                                                                tsk.cfg.get("job", "guestworkingdir"), analysis_rv))
-    analysis_thread.start()
+    multicall.execute(cmd, 60, True, guest_dir)
 
     if interactive:
-        """
-        Pause for sample to start
-        """
-        time.sleep(5)
+        tsk.log("Starting clicks")
+        cmd = guest_dir + "\\clicks.exe"
+        multicall.execute(cmd, 60, True, guest_dir)
 
-        """
-        Simulate 3 clicks
-        """
-        tsk.log("Running clicks")
-        cmd = guest_dir + "clicks.exe"
-        clicks_rv = True
-        clicks_thread = threading.Thread(target=remote_run, args=(tsk, cmd, execution_time, True,
-                                                                  tsk.cfg.get("job", "guestworkingdir"), clicks_rv))
-        clicks_thread.start()
-        clicks_thread.join()
+    rv = False
+    for result in multicall():
+        tsk.log("Getting multicall result")
+        rv = result
+        break
 
-        """
-        Walk through install dialogs
-        """
-        tsk.log("Running clicker")
-        cmd = guest_dir + "clicker.exe " + guest_dir + r"\\clicker-log.txt"
-        clicker_rv = True
-        clicker_thread = threading.Thread(target=remote_run, args=(tsk, cmd, execution_time, True,
-                                                                   tsk.cfg.get("job", "guestworkingdir"), clicker_rv))
-        clicker_thread.start()
-
-    analysis_thread.join()
-    if analysis_rv:
-        rv = analysis_rv
+    if rv:
         src = tsk.cfg.get("job", "pinlog")
         dst = os.path.join(tsk.logdir, '%s.%s.txt' % (tsk.sample.name, suffix))
         tsk.log("Getting results: %s, %s" % (src, dst))
