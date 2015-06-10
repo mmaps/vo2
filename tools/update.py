@@ -60,6 +60,7 @@ def run(tsk):
 
     tsk.log("Connecting to new, updated agent")
     tsk.vm.connect()
+    tsk.vm._guest.ping()
 
     cmd = "rmdir /S /Q c:\\tmp"
     tsk.log("TOOL:"+cmd)
