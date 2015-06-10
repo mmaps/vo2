@@ -44,6 +44,7 @@ def main(addr, port, type_):
     if backend_type:
         logging.info('main registering and server')
         server.register_instance(backend_type())
+        server.register_multicall_functions()
         server.serve_forever()
     
 if __name__ == '__main__':
