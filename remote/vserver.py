@@ -36,7 +36,18 @@ class VServer(object):
             log.info("STDOUT: %s\nSTDERR: %s" % (stdout, stderr))
             qout.put([True, stdout, stderr])
 
+    def exec_service(self, cmd, work_dir=None):
+        use_shell = not isinstance(cmd, list)
+        try:
+            child = Popen(cmd, shell=use_shell)
+        except (OSError, ValueError) as error:
+            log.error(error)
+            return [False, format_exc(), error]
+        else:
+            return [True, child.pid, '']
+
     def execute(self, cmd, timeout=0, verbose=False, work_dir=None):
+        print "Execute: %s" % cmd
         shell = not isinstance(cmd, list)
 
         target = self.vexec
@@ -88,6 +99,7 @@ class VServer(object):
 class EvalServer(VServer):
 
     def guest_eval(self, src):
+        print "Eval: %s" % src
         try:
             code_obj = compile(src, "<string>", "exec")
         except (SyntaxError, TypeError) as e:
