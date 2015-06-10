@@ -82,7 +82,6 @@ class Task(object):
 
     def log(self, msg):
         try:
-            print msg
             self.logfile.write("%s: %s\n" % (strftime("%H:%M:%S", localtime()), msg))
         except IOError as err:
             sys.stderr.write("Logging error: %s\n" % err)
