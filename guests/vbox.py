@@ -69,8 +69,9 @@ class VirtualMachine(VirtualDevice):
 
     def ping_agent(self):
         if self.connect():
-            self.debug("pinged agent")
-            return self.launch("echo Host Connected", 1, working_dir="C:\\malware")
+            self.debug("pinging agent")
+            #return self.launch("echo Host Connected", 1, working_dir="C:\\malware")
+            return self._guest.ping()
         else:
             self.debug("agent did not respond")
         return False
@@ -200,12 +201,12 @@ class VirtualMachine(VirtualDevice):
             sys.stderr.write("%s: unable to signal completion to VM manager. Messages queue not set\n" % self.name)
 
     def launch(self, cmd, exec_time=30, verbose=False, working_dir=''):
-        self.debug("guest_cmd: %s, time=%s, verbose=%s, dir=%s\n" % (cmd, exec_time, verbose, working_dir))
 
         rv = False
         rpc_num_try = 0
 
         while not rv and rpc_num_try < self.rpc_attempts:
+            self.debug("guest_cmd: %s, time=%s, verbose=%s, dir=%s, try=%s" % (cmd, exec_time, verbose, working_dir, rpc_num_try))
             try:
                 rv, out, err = self._guest.execute(cmd, exec_time, verbose, working_dir)
             except TypeError:
@@ -218,15 +219,14 @@ class VirtualMachine(VirtualDevice):
                     pass
                 else:
                 """
-                self.debug("Launch error: %s\n%s" % (cmd, e))
+                self.error("Launch error: %s\n%s" % (cmd, e))
             else:
                 if out:
                     self.debug(out)
                 if err:
                     self.error(err)
             finally:
-                if not rv:
-                    rpc_num_try += 1
+                rpc_num_try += 1
         return rv
 
     def push(self,user, src, dst, dir_):
@@ -242,7 +242,7 @@ class VirtualMachine(VirtualDevice):
         cmd = [EXEDIR + '\\winscp.exe',
                '/console', '/command',
                '"option confirm off"',
-               #'"option batch abort"',
+               '"option batch abort"',
                '"open %s@%s -hostkey=* -privatekey=%s"' % (user, self.gateway, KEY),
                '"get %s %s"' % (src, dst),
                '"exit"']
