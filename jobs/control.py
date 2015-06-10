@@ -24,6 +24,7 @@ class TaskController(multiprocessing.Process):
         self.work_queue = work_queue
         self.stop = False
         self.log = logs.init_logging("%s" % self, self.cfg.get("general", "debug"))
+        self.task = None
 
     def init_sig_handler(self, sig, lock):
         self.log.info("Installing SIGINT handler in TaskController")
@@ -44,6 +45,10 @@ class TaskController(multiprocessing.Process):
 
         def sigterm_handler(signal_, frame):
             self.log.debug("Exiting...")
+            try:
+                self.task.logfile.flush()
+            except AttributeError:
+                self.log.error("Could not flush logfile for task: %s" % self.task)
             sys.exit(1)
 
         if sig == signal.SIGINT:
@@ -93,6 +98,7 @@ class TaskController(multiprocessing.Process):
         self.cleanup_vm()
 
     def setup_task(self, tsk, logdir, logfile):
+        self.task = tsk
         tsk.set_vm(self.vm)
         tsk.set_log(logdir, logfile)
         return tsk.vm and tsk.logdir and tsk.logfile
@@ -155,6 +161,7 @@ class TaskController(multiprocessing.Process):
         self.log.debug("Cleaning up task: %s" % tsk)
         tsk.logfile.flush()
         tsk.logfile.close()
+        self.task = None
 
     def cleanup_vm(self):
         self.vm.set_log(None)
