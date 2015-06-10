@@ -28,7 +28,7 @@ class Scheduler(object):
 
         def sigint_handler(signal_, frame):
             signal.signal(signal.SIGINT, signal.SIG_IGN)
-            sys.stdout.write("Signal caught in PID: %s...\nWaiting tasks enqueued: %d / %d\n" % (os.getpid(), self.task_cnt, self.task_max))
+            sys.stdout.write("Signal caught in PID: %s...\nTasks in queue: %d / %d\n" % (os.getpid(), self.task_cnt, self.task_max))
             proceed = ""
             while proceed != "y" and proceed != "n":
                 proceed = raw_input("Continue? y/n\n").lower()
@@ -113,7 +113,7 @@ class Scheduler(object):
         self.close_queue(self.task_queue)
 
     def join_children(self, children):
-        self.log.debug("Joining child processes...")
+        self.log.debug("Waiting for task processes to exit...")
         for child in children:
             child.join()
 
