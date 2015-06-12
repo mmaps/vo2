@@ -1,3 +1,5 @@
+import re
+import socket
 import sys
 from time import sleep, time
 from xmlrpclib import ServerProxy
@@ -12,18 +14,18 @@ CMD = r'/usr/bin/VBoxManage'
 EXEDIR = r'c:\remote\bin'
 USER = 'logger'
 KEY = r'c:\remote\keys\voo_priv.ppk'
-PSCP = r'c:\remote\bin\pscp.exe'
 WINSCP = r'c:\remote\bin\winscp.exe'
 
 
 class VirtualMachine(VirtualDevice):
 
+    hostif = dict()
     proc = ProcessManager()
 
     def start(self):
         self.debug("Start %s [%s:%s]" % (self.name, self.addr, self.port))
 
-        self.update_state()
+        self.update_info()
         self.debug("current state: %s" % self.state_str)
 
         if self.is_running():
@@ -44,7 +46,10 @@ class VirtualMachine(VirtualDevice):
         sleep(.5)
 
         if not self.wait_agent():
-            return False
+            self.debug("Timeout waiting for agent.")
+            self.force_arp()
+            if not self.wait_agent():
+                return False
 
         self.debug("Agent online")
         return True
@@ -55,26 +60,36 @@ class VirtualMachine(VirtualDevice):
         t.daemon = True
         t.start()
         t.join(self.timeout_vm)
-        if t.is_alive():
-            self.debug("Timeout waiting for agent")
-            self.poweroff()
-            return False
-        return True
+        return not t.is_alive()
 
     def _wait_agent(self):
         while not self.ping_agent():
             self.debug("Ping %s" % self.name)
-            self.ping_agent()
             sleep(1)
 
     def ping_agent(self):
+        rv = False
         if self.connect():
-            self.debug("pinging agent")
-            #return self.launch("echo Host Connected", 1, working_dir="C:\\malware")
-            return self._guest.ping()
-        else:
-            self.debug("agent did not respond")
-        return False
+            try:
+                rv = self._guest.ping()
+            except socket.error as e:
+                if e.errno is 60:
+                    """
+                    Timed out
+                    """
+                    self.error("Ping timed out")
+                else:
+                    self.error("Ping error: %s" % e)
+        return rv
+
+    def force_arp(self):
+        try:
+            macaddr = self.get_nic_mac(1)
+        except IndexError:
+            return False
+        cmd = ["sudo", "arp", "-S", self.addr, macaddr, "temp"]
+        self.debug("Setting ARP manually: %s" % macaddr)
+        self.proc.execute(cmd, verbose=True)
 
     def connect(self, addr=None, port=None):
         if not addr:
@@ -104,7 +119,7 @@ class VirtualMachine(VirtualDevice):
 
     def restore(self, name=''):
         self.debug("Checking state for restore")
-        self.update_state()
+        self.update_info()
         if self.is_off() or self.is_aborted():
             self.debug("Attempting restore")
             cmd = [CMD, 'snapshot', self.name]
@@ -131,34 +146,122 @@ class VirtualMachine(VirtualDevice):
             self.debug('del_snap error: %s' % cmd)
             return False
 
-    def update_state(self):
+    def reset_state(self):
+        self.hostif = dict()
+        self.state = self.UNKNOWN
+        self.state_str = 'unknown'
+
+    def update_info(self):
+        self.reset_state()
         cmd = [CMD, 'showvminfo', self.name, '--machinereadable']
-        self.debug("update state: %s" % cmd)
+        self.debug("Update VM information")
         pid = self.proc.execute(cmd)
         out, err = self.proc.get_output(pid)
-        if not out:
+        vm_info = self.parse_vminfo(out)
+        if vm_info:
+            self.update_state(vm_info)
+            self.update_network(vm_info)
+
+    def parse_vminfo(self, stdout):
+        vminfo = {}
+        try:
+            lines = stdout.split("\n")
+            for line in lines:
+                if line:
+                    key, val = self.parse_infoline(line)
+                    vminfo[key] = val
+        except AttributeError as e:
+            self.error("Unable to parse 'showvminfo': %s" % e)
+            vminfo = {}
+        return vminfo
+
+    def parse_infoline(self, infoline):
+        key, _, value = infoline.partition("=")
+        if value.startswith('"'):
+            value = value.strip('"')
+        else:
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                self.error("Unable to interpret VM info for %s" % infoline)
+                value = ''
+        return key, value
+
+    def update_state(self, vminfo):
+        st = vminfo.get("VMState")
+        if st == 'running':
+            self.state = self.RUNNING
+            self.state_str = 'running'
+        elif st == 'saved':
+            self.state = self.SAVED
+            self.state_str = 'saved'
+        elif st == 'poweroff':
+            self.state = self.POWEROFF
+            self.state_str = 'poweroff'
+        elif st == 'aborted':
+            self.state = self.ABORTED
+            self.state_str = 'aborted'
+        else:
+            self.debug("Unknown VM state: %s" % st)
             self.state = self.UNKNOWN
             self.state_str = 'unknown'
             return self.state
-        for line in out.split('\n'):
-            if line.startswith('VMState='):
-                st = line.partition('=')[2].strip('"')
-                if st == 'running':
-                    self.state = self.RUNNING
-                    self.state_str = 'running'
-                elif st == 'saved':
-                    self.state = self.SAVED
-                    self.state_str = 'saved'
-                elif st == 'poweroff':
-                    self.state = self.POWEROFF
-                    self.state_str = 'poweroff'
-                elif st == 'aborted':
-                    self.state = self.ABORTED
-                    self.state_str = 'aborted'
-                else:
-                    self.state = self.UNKNOWN
-                    self.state_str = 'unknown'
-                return self.state
+
+    def update_network(self, vminfo):
+        nics = self.find_nics(vminfo.keys())
+        for nic in nics:
+            self.update_nic(vminfo, nic)
+
+    def find_nics(self, keylist):
+        nicpattern = re.compile("nic\d\d?")
+        nics = [key for key in keylist if nicpattern.match(key)]
+        self.debug("VM NICs found: %s" % nics)
+        return nics
+
+    def update_nic(self, vminfo, nic_name):
+        nic_num = self.parse_nicname(nic_name)
+        if vminfo.get(nic_name) == "hostonly":
+            self.update_hostif(vminfo, nic_num)
+
+    def update_hostif(self, vminfo, num):
+        self.debug("Found Host Only Interface: %s" % num)
+        try:
+            mac = vminfo["macaddress%d" % num]
+        except (TypeError, KeyError):
+            mac = "FF:FF:FF:FF:FF:FF"
+        self.set_nic_mac(num, mac)
+
+    def set_nic_mac(self, nic_num, mac):
+        self.debug("Setting NIC MAC address: %s,%s" % (nic_num, mac))
+        try:
+            self.hostif[nic_num] = {"type": "hostonly", "num": nic_num, "mac": mac}
+        except KeyError:
+            self.error("Unknown NIC number: %s, %s" % (nic_num, mac))
+
+    def get_nic_mac(self, nic_num):
+        try:
+            mac = self.hostif[nic_num]
+        except KeyError:
+            mac = "FF:FF:FF:FF:FF:FF"
+        return mac
+
+    def parse_nicname(self, nic_name=''):
+        """
+
+        :type nic_name: str
+        :rtype: int
+        """
+        try:
+            num = int(nic_name.replace("nic", ""))
+        except (ValueError, TypeError):
+            self.error("Unable to determine NIC number: %s" % nic_name)
+            num = -1
+        return num
+
+    def parse_hostif(self, adapter_num):
+        _, adapter, num = adapter_num.partition("hostonlyadapter")
+        self.debug("Parsed %s: %s,%s" % (adapter_num, adapter, num))
+        return adapter, num
 
     def start_sniff(self):
         cmd = [CMD, 'controlvm', self.name, 'nictrace1', 'on']
