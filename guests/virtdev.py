@@ -44,7 +44,7 @@ class VirtualDevice(object):
         pass
 
     @abc.abstractmethod
-    def update_state(self):
+    def update_info(self):
         pass
 
     @abc.abstractmethod
