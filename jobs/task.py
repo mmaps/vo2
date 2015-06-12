@@ -29,7 +29,7 @@ class Task(object):
         self.vm.log = logfile
 
     def setup_vm(self):
-        self.vm.update_state()
+        self.vm.update_info()
         if self.vm.is_running():
             self.log("task - Setup Powering off VM")
             self.vm.poweroff()
@@ -68,7 +68,7 @@ class Task(object):
             self.log("Can't load invalid source: %s" % src)
             return False
         dst = "%s\\%s" % (self.cfg.get("job", "guestworkingdir"), dst)
-        self.log("task -  Pushing sample\n\t\tTASK: src %s\n\t\tTASK: dst %s" % (src, dst))
+        self.log("task -  push src:%s,dst:%s" % (src, dst))
         return self.vm.push(self.cfg.get("job", "user"), src, dst, self.cfg.get("job", "guestworkingdir"))
 
     def load_sample(self):
@@ -77,13 +77,13 @@ class Task(object):
             return False
         src = self.sample.path
         dst = "%s\\%s" % (self.cfg.get("job", "guestworkingdir"), repr(self.sample))
-        self.log("task -  Pushing sample\n\t\tTASK: src %s\n\t\tTASK: dst %s" % (src, dst))
+        self.log("task -  push src:%s,dst:%s" % (src, dst))
         return self.vm.push(self.cfg.get("job", "user"), src, dst, self.cfg.get("job", "guestworkingdir"))
 
     def log(self, msg):
         try:
             self.logfile.write("%s: %s\n" % (strftime("%H:%M:%S", localtime()), msg))
-        except IOError as err:
+        except (IOError, ValueError) as err:
             sys.stderr.write("Logging error: %s\n" % err)
         except AttributeError:
             sys.stderr.write(msg)
