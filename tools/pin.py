@@ -99,10 +99,14 @@ def run(tsk):
         rv = analyze(tsk, pincmd, bincmd, exec_time, 'pdf')
 
     elif tsk.sample.filetype is files.DLL:
-        for s in spoofs:
-            tsk.log("Analyzing DLL with %s" % s)
-            bincmd = '"%s\\spoofs\\%s" ' % (guest_dir, s)
-            rv = analyze(tsk, pincmd, bincmd, exec_time, s)
+        try:
+            for s in spoofs:
+                tsk.log("Analyzing DLL with %s" % s)
+                bincmd = '"%s\\spoofs\\%s" ' % (guest_dir, s)
+                rv = analyze(tsk, pincmd, bincmd, exec_time, s)
+        except TypeError:
+            tsk.log("Incorrect DLL execution spoof program settings: %s" % spoofs)
+            rv = False
 
     elif tsk.sample.filetype is files.EXE:
         tsk.log("Analyzing EXE")
